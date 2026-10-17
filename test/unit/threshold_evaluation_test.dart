@@ -55,22 +55,22 @@ void main() {
       expect(isWithinCold, isFalse);
     });
 
-    test('Readings older than 90 seconds are classified as Stale', () {
+    test('Readings older than 60 seconds are classified as Stale / Offline', () {
       final oldReading = SensorReading(
         normalTemperatureC: 21.0,
         normalHumidityPct: 48.0,
         coldTemperatureC: 4.5,
         coldHumidityPct: 50.0,
-        recordedAt: DateTime.now().subtract(const Duration(seconds: 120)),
+        recordedAt: DateTime.now().subtract(const Duration(seconds: 70)),
       );
 
       expect(
-        oldReading.isStale(threshold: const Duration(seconds: 90)),
+        oldReading.isStale(),
         isTrue,
       );
     });
 
-    test('Fresh reading under 90 seconds is not stale', () {
+    test('Fresh reading under 60 seconds is not stale', () {
       final freshReading = SensorReading(
         normalTemperatureC: 21.0,
         normalHumidityPct: 48.0,
@@ -80,7 +80,7 @@ void main() {
       );
 
       expect(
-        freshReading.isStale(threshold: const Duration(seconds: 90)),
+        freshReading.isStale(),
         isFalse,
       );
     });

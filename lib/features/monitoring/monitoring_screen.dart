@@ -25,9 +25,14 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(18),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(hardwareSensorServiceProvider).fetchLatest();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(18),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top Telemetry Header
@@ -310,8 +315,9 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildWindowTab(Duration duration, String label) {
     final isSelected = _selectedWindow == duration;

@@ -165,9 +165,9 @@ final overallStatusProvider = Provider<OverallStatus>((ref) {
     return OverallStatus.offline;
   }
 
-  // If telemetry is older than 90 seconds, status is unknown/offline, never false normal
+  // If telemetry is older than 60 seconds, device is marked offline, never false normal
   if (reading.isStale()) {
-    return OverallStatus.unknown;
+    return OverallStatus.offline;
   }
 
   if (reading.sensorHealth == SensorHealth.error) {

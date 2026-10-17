@@ -5,7 +5,7 @@ enum DataSourceType {
   String get label {
     switch (this) {
       case DataSourceType.simulated:
-        return 'Simulated';
+        return 'ESP32 Simulator';
       case DataSourceType.hardware:
         return 'ESP32 Hardware';
     }
@@ -104,7 +104,7 @@ class SensorReading {
   });
 
   /// True if reading was recorded more than [threshold] ago
-  bool isStale({Duration threshold = const Duration(seconds: 90)}) {
+  bool isStale({Duration threshold = const Duration(seconds: 60)}) {
     return DateTime.now().difference(recordedAt) > threshold;
   }
 
@@ -186,7 +186,8 @@ class SensorReading {
       sensorHealth: SensorHealth.fromString(map['sensor_health']?.toString()),
       dataSource: DataSourceType.fromString(map['data_source']?.toString()),
       recordedAt: map['recorded_at'] != null
-          ? DateTime.tryParse(map['recorded_at'].toString()) ?? DateTime.now()
+          ? (DateTime.tryParse(map['recorded_at'].toString())?.toLocal()) ??
+              DateTime.now()
           : DateTime.now(),
     );
   }

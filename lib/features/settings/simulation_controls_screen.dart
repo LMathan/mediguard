@@ -136,7 +136,7 @@ class SimulationControlsScreen extends ConsumerWidget {
             _buildScenarioTile(
               ref: ref,
               scenario: SimulationScenario.staleData,
-              title: '6. Stale Telemetry (>90s Inactive)',
+              title: '6. Stale Telemetry (>60s Inactive)',
               desc:
                   'Readings stop refreshing; tests Unknown/Stale fallback state.',
               isActive: activeScenario == SimulationScenario.staleData,

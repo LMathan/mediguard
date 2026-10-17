@@ -26,7 +26,7 @@ enum SimulationScenario {
       case SimulationScenario.sensorError:
         return 'Sensor Checksum Error Fault';
       case SimulationScenario.staleData:
-        return 'Stale Telemetry (>90s Inactive)';
+        return 'Stale Telemetry (>60s Inactive)';
       case SimulationScenario.offline:
         return 'Device Completely Offline';
       case SimulationScenario.recovery:

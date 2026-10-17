@@ -37,6 +37,7 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: () async {
+          await ref.read(hardwareSensorServiceProvider).fetchLatest();
           await ref.read(alertsProvider.notifier).refresh();
           await ref.read(transactionsProvider.notifier).refresh();
         },
