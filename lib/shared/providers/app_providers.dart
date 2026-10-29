@@ -1,3 +1,4 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/alert_item.dart';
 import '../../data/models/device_info.dart';
@@ -19,6 +20,11 @@ import '../../data/services/supabase_service.dart';
 // 1. Core Services Providers
 final supabaseServiceProvider = Provider<SupabaseService>((ref) {
   return SupabaseService();
+});
+
+final authStateStreamProvider = StreamProvider<AuthState?>((ref) {
+  final supabase = ref.watch(supabaseServiceProvider);
+  return supabase.authStateChanges ?? const Stream.empty();
 });
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
@@ -117,8 +123,21 @@ final deviceSettingsProvider =
 class DeviceInfoNotifier extends AsyncNotifier<DeviceInfo> {
   @override
   Future<DeviceInfo> build() async {
+    // Re-fetch when auth state changes
+    ref.watch(authStateStreamProvider);
     final repo = ref.watch(settingsRepositoryProvider);
     return await repo.getDeviceInfo();
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    try {
+      final repo = ref.read(settingsRepositoryProvider);
+      final info = await repo.getDeviceInfo();
+      state = AsyncValue.data(info);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
   Future<void> updateDevice(DeviceInfo info) async {

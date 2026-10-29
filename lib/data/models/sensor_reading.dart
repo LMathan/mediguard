@@ -5,9 +5,9 @@ enum DataSourceType {
   String get label {
     switch (this) {
       case DataSourceType.simulated:
-        return 'ESP32 Simulator';
+        return 'Simulated Telemetry';
       case DataSourceType.hardware:
-        return 'ESP32 Hardware';
+        return 'MediGuard Hardware';
     }
   }
 
@@ -104,7 +104,7 @@ class SensorReading {
   });
 
   /// True if reading was recorded more than [threshold] ago
-  bool isStale({Duration threshold = const Duration(seconds: 60)}) {
+  bool isStale({Duration threshold = const Duration(seconds: 120)}) {
     return DateTime.now().difference(recordedAt) > threshold;
   }
 

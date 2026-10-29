@@ -9,10 +9,10 @@ class SettingsRepository {
 
   DeviceSettings _cachedSettings = DeviceSettings.defaultSettings();
   DeviceInfo _cachedDevice = DeviceInfo(
-    id: 'dev-001',
+    id: 'c0b54f87-1f7b-45a7-8554-de66122a0fbe',
     deviceName: 'MediGuard Smart Box Alpha',
     modelVersion: 'ESP32-MediGuard-v1',
-    serialNumber: 'MG-2026-ESP32-001',
+    serialNumber: 'mediguard-container-01',
     isOnline: true,
     dataSource: DataSourceType.hardware,
     createdAt: DateTime.now().subtract(const Duration(days: 30)),
@@ -74,12 +74,15 @@ class SettingsRepository {
     final client = _supabaseService.client;
     final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
-        final data = await client
-            .from('devices')
-            .select()
-            .eq('user_id', userId)
+        var query = client.from('devices').select();
+        if (userId != null) {
+          query = query.eq('user_id', userId);
+        }
+        final data = await query
+            .order('last_seen_at', ascending: false)
+            .limit(1)
             .maybeSingle();
 
         if (data != null) {
@@ -93,7 +96,6 @@ class SettingsRepository {
 
     return _cachedDevice;
   }
-
   Future<DeviceInfo> updateDeviceInfo(DeviceInfo info) async {
     _cachedDevice = info;
 

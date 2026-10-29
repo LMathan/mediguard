@@ -15,9 +15,28 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(deviceSettingsProvider).value;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings & Configuration')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      appBar: AppBar(
+        title: const Text('Settings & Configuration'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Device Info',
+            onPressed: () {
+              ref.invalidate(deviceInfoProvider);
+              ref.invalidate(deviceSettingsProvider);
+            },
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(deviceInfoProvider);
+          ref.invalidate(deviceSettingsProvider);
+          await ref.read(deviceInfoProvider.future);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -164,7 +183,7 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   _buildSettingRow(
                     'Device Name',
-                    deviceInfo?.deviceName ?? 'MediGuard Box Alpha',
+                    deviceInfo?.deviceName ?? 'MediGuard Smart Box Alpha',
                   ),
                   const Divider(height: 18),
                   _buildSettingRow(
@@ -174,14 +193,14 @@ class SettingsScreen extends ConsumerWidget {
                   const Divider(height: 18),
                   _buildSettingRow(
                     'Serial Number',
-                    deviceInfo?.serialNumber ?? 'MG-2026-ESP32-001',
+                    deviceInfo?.serialNumber ?? 'mediguard-container-01',
                   ),
                   const Divider(height: 18),
                   _buildSettingRow(
                     'Data Source',
                     ref.watch(sensorDataSourceProvider).isSimulated
                         ? 'Simulated Telemetry'
-                        : 'Physical ESP32',
+                        : 'MediGuard Hardware Unit',
                   ),
                 ],
               ),
@@ -318,6 +337,7 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 
