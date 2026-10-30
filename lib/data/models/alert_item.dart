@@ -99,18 +99,23 @@ enum AlertType {
   static AlertType fromString(String? val) {
     switch (val) {
       case 'high_temp':
+      case 'cold_temp_high':
+      case 'temperature_critical':
         return AlertType.highTemp;
       case 'low_temp':
+      case 'cold_temp_low':
         return AlertType.lowTemp;
       case 'high_humidity':
         return AlertType.highHumidity;
       case 'low_humidity':
         return AlertType.lowHumidity;
       case 'door_left_open':
+      case 'door_open':
         return AlertType.doorLeftOpen;
       case 'device_offline':
         return AlertType.deviceOffline;
       case 'sensor_error':
+      case 'sensor_fault':
         return AlertType.sensorError;
       case 'medicine_nearing_expiry':
         return AlertType.medicineNearingExpiry;

@@ -56,6 +56,23 @@ class NotificationService {
     }
   }
 
+  Future<bool> areNotificationsEnabled() async {
+    try {
+      final androidImplementation = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      if (androidImplementation != null) {
+        final enabled = await androidImplementation.areNotificationsEnabled();
+        return enabled ?? false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[NotificationService] areNotificationsEnabled error: $e');
+      return true;
+    }
+  }
+
   Future<bool> requestPermissions() async {
     try {
       final androidImplementation = _notificationsPlugin
@@ -117,6 +134,25 @@ class NotificationService {
       );
     } catch (e) {
       debugPrint('[NotificationService] Error showing notification: $e');
+    }
+  }
+
+  /// Mark an alert as recently notified (e.g. from OneSignal push) to prevent duplicate local alerts
+  void markAlertAsRecentlyNotified(String alertKey) {
+    _recentlyNotifiedAlerts.add(alertKey);
+    Future.delayed(const Duration(minutes: 5), () {
+      _recentlyNotifiedAlerts.remove(alertKey);
+    });
+  }
+
+  /// Cancel an active notification when the condition has been resolved
+  Future<void> cancelAlert(String alertKey) async {
+    final notificationId = alertKey.hashCode.abs() % 100000;
+    try {
+      await _notificationsPlugin.cancel(id: notificationId);
+      _recentlyNotifiedAlerts.remove(alertKey);
+    } catch (e) {
+      debugPrint('[NotificationService] Error cancelling notification: $e');
     }
   }
 }

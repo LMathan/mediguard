@@ -84,5 +84,13 @@ void main() {
       expect(resolved.status, equals(AlertStatus.resolved));
       expect(resolved.resolvedAt, isNotNull);
     });
+
+    test('AlertType.fromString maps backend alert aliases correctly', () {
+      expect(AlertType.fromString('cold_temp_high'), AlertType.highTemp);
+      expect(AlertType.fromString('temperature_critical'), AlertType.highTemp);
+      expect(AlertType.fromString('cold_temp_low'), AlertType.lowTemp);
+      expect(AlertType.fromString('door_open'), AlertType.doorLeftOpen);
+      expect(AlertType.fromString('sensor_fault'), AlertType.sensorError);
+    });
   });
 }

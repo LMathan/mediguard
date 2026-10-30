@@ -109,16 +109,20 @@ class HomeScreen extends ConsumerWidget {
                           color: Colors.white70,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          currentReading.recordedAt.millisecondsSinceEpoch == 0
-                              ? 'Awaiting hardware data in DB'
-                              : 'Updated: ${Formatters.timeAgo(currentReading.recordedAt)} (${Formatters.shortTime(currentReading.recordedAt)})',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
+                        Expanded(
+                          child: Text(
+                            currentReading.recordedAt.millisecondsSinceEpoch == 0
+                                ? 'Awaiting hardware data in DB'
+                                : 'Updated: ${Formatters.timeAgo(currentReading.recordedAt)} (${Formatters.shortTime(currentReading.recordedAt)})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,

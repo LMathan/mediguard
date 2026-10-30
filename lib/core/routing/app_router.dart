@@ -36,7 +36,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/home',
+    initialLocation: supabase.isAuthenticated ? '/home' : '/login',
     refreshListenable: supabase,
     redirect: (context, state) {
       final isAuth = supabase.isAuthenticated;

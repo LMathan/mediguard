@@ -104,7 +104,7 @@ class SensorReading {
   });
 
   /// True if reading was recorded more than [threshold] ago
-  bool isStale({Duration threshold = const Duration(seconds: 120)}) {
+  bool isStale({Duration threshold = const Duration(seconds: 60)}) {
     return DateTime.now().difference(recordedAt) > threshold;
   }
 

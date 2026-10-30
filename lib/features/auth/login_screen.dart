@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/auth_error_formatter.dart';
 import '../../shared/providers/app_providers.dart';
+import '../../shared/widgets/notification_permission_sheet.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -19,6 +20,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        NotificationPermissionSheet.showIfNeeded(context);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -62,6 +73,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final supabase = ref.watch(supabaseServiceProvider);
+    if (supabase.isServiceInitialized && supabase.isAuthenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.go('/home');
+        }
+      });
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Center(

@@ -56,7 +56,7 @@ class AlertRepository {
             .from('alerts')
             .select('id')
             .eq('user_id', userId)
-            .eq('type', newAlert.type.dbValue)
+            .inFilter('type', _matchingDbValues(newAlert.type))
             .eq('status', 'active')
             .maybeSingle();
 
@@ -69,7 +69,7 @@ class AlertRepository {
 
           if (newAlert.severity == AlertSeverity.critical) {
             await _notificationService.showCriticalAlert(
-              alertKey: '${newAlert.type.name}_${newAlert.id}',
+              alertKey: newAlert.type.name,
               title: newAlert.title,
               body: newAlert.message,
             );
@@ -149,12 +149,30 @@ class AlertRepository {
     }
   }
 
+  List<String> _matchingDbValues(AlertType type) {
+    switch (type) {
+      case AlertType.highTemp:
+        return ['high_temp', 'cold_temp_high', 'temperature_critical'];
+      case AlertType.lowTemp:
+        return ['low_temp', 'cold_temp_low'];
+      case AlertType.doorLeftOpen:
+        return ['door_left_open', 'door_open'];
+      case AlertType.sensorError:
+        return ['sensor_error', 'sensor_fault'];
+      case AlertType.deviceOffline:
+        return ['device_offline'];
+      default:
+        return [type.dbValue];
+    }
+  }
+
   Future<void> resolveAlertsOfType(AlertType type) async {
     final client = _supabaseService.client;
     final userId = _supabaseService.currentUserId;
 
     if (client != null && userId != null) {
       try {
+        final dbValues = _matchingDbValues(type);
         await client
             .from('alerts')
             .update({
@@ -162,7 +180,7 @@ class AlertRepository {
               'resolved_at': DateTime.now().toIso8601String(),
             })
             .eq('user_id', userId)
-            .eq('type', type.dbValue)
+            .inFilter('type', dbValues)
             .eq('status', 'active');
       } catch (e) {
         debugPrint(

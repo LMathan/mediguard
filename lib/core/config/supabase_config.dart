@@ -1,16 +1,10 @@
 import 'package:flutter/foundation.dart';
 
 class SupabaseConfig {
-  // Compile-time environment definitions or defaults
-  static const String supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://bskjisnvumbsiwcahvyw.supabase.co',
-  );
+  // Compile-time environment definitions loaded via --dart-define-from-file=.env
+  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_43KPE7YGnNbT6RXg9gucDw_abLdXZ_h',
-  );
+  static const String supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
   /// Check whether valid Supabase credentials have been configured
   static bool get isConfigured {
@@ -20,8 +14,9 @@ class SupabaseConfig {
         supabaseAnonKey != 'your-publishable-or-anon-key-here';
   }
 
-  /// Project reference identifier
-  static const String projectRef = 'bskjisnvumbsiwcahvyw';
+  /// Project reference identifier extracted from Supabase URL
+  static String get projectRef =>
+      Uri.tryParse(supabaseUrl)?.host.split('.').first ?? '';
 
   static void printStatus() {
     if (kDebugMode) {

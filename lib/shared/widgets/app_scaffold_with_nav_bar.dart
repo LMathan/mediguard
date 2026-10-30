@@ -4,21 +4,58 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../providers/app_providers.dart';
 import 'demo_mode_banner.dart';
+import 'notification_permission_sheet.dart';
 
-class AppScaffoldWithNavBar extends ConsumerWidget {
+class AppScaffoldWithNavBar extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
   const AppScaffoldWithNavBar({super.key, required this.navigationShell});
 
+  @override
+  ConsumerState<AppScaffoldWithNavBar> createState() =>
+      _AppScaffoldWithNavBarState();
+}
+
+class _AppScaffoldWithNavBarState extends ConsumerState<AppScaffoldWithNavBar>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Check notification permission whenever screen mounts
+      _checkNotificationPermission();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkNotificationPermission();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void _checkNotificationPermission() {
+    if (!mounted) return;
+    NotificationPermissionSheet.showIfNeeded(context);
+  }
+
   void _onItemTapped(int index) {
-    navigationShell.goBranch(
+    widget.navigationShell.goBranch(
       index,
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: index == widget.navigationShell.currentIndex,
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final activeAlerts = ref.watch(activeAlertsProvider);
     final isSimulated = ref.watch(sensorDataSourceProvider).isSimulated;
 
@@ -91,12 +128,12 @@ class AppScaffoldWithNavBar extends ConsumerWidget {
         child: Column(
           children: [
             if (isSimulated) const DemoModeBanner(),
-            Expanded(child: navigationShell),
+            Expanded(child: widget.navigationShell),
           ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: navigationShell.currentIndex,
+        currentIndex: widget.navigationShell.currentIndex,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppColors.primary,

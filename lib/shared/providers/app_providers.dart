@@ -14,6 +14,7 @@ import '../../data/repositories/transaction_repository.dart';
 import '../../data/services/demo_sensor_service.dart';
 import '../../data/services/hardware_sensor_service.dart';
 import '../../data/services/notification_service.dart';
+import '../../data/services/onesignal_service.dart';
 import '../../data/services/sensor_data_source.dart';
 import '../../data/services/supabase_service.dart';
 
@@ -29,6 +30,10 @@ final authStateStreamProvider = StreamProvider<AuthState?>((ref) {
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService();
+});
+
+final oneSignalServiceProvider = Provider<OneSignalService>((ref) {
+  return OneSignalService();
 });
 
 final hardwareSensorServiceProvider = Provider<HardwareSensorService>((ref) {
@@ -360,16 +365,108 @@ final filteredMedicinesProvider = Provider<List<Medicine>>((ref) {
 
 // 9. Alerts Notifiers
 class AlertsNotifier extends AsyncNotifier<List<AlertItem>> {
+  RealtimeChannel? _alertsChannel;
+
   @override
   Future<List<AlertItem>> build() async {
     final repo = ref.watch(alertRepositoryProvider);
-    return await repo.getAlerts();
+    final supabase = ref.watch(supabaseServiceProvider);
+
+    if (supabase.client != null) {
+      _alertsChannel?.unsubscribe();
+      _alertsChannel = supabase.client!
+          .channel('public:alerts:${supabase.currentUserId ?? 'all'}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'alerts',
+            callback: (_) {
+              refresh();
+            },
+          )
+          .subscribe();
+
+      ref.onDispose(() {
+        if (_alertsChannel != null && supabase.client != null) {
+          supabase.client!.removeChannel(_alertsChannel!);
+        }
+      });
+    }
+
+    // Automatically resolve alerts when nominal telemetry arrives
+    ref.listen(sensorReadingStreamProvider, (_, next) {
+      final reading = next.value;
+      if (reading != null) {
+        autoResolveNominal(reading);
+      }
+    });
+
+    final alerts = await repo.getAlerts();
+    _triggerLocalNotificationsForActive(alerts);
+    return alerts;
+  }
+
+  void _triggerLocalNotificationsForActive(List<AlertItem> alerts) {
+    final seenTypes = <AlertType>{};
+    for (final alert in alerts) {
+      if (alert.isActive && alert.severity == AlertSeverity.critical) {
+        if (!seenTypes.add(alert.type)) {
+          // Suppress duplicate notification of the same alert type in this batch
+          continue;
+        }
+        NotificationService().showCriticalAlert(
+          alertKey: alert.type.name,
+          title: alert.title,
+          body: alert.message,
+        );
+      }
+    }
+  }
+
+  Future<void> autoResolveNominal(SensorReading reading) async {
+    final repo = ref.read(alertRepositoryProvider);
+    bool changed = false;
+
+    // If reading is fresh (under 60s), auto-resolve device offline alerts!
+    if (!reading.isStale()) {
+      await repo.resolveAlertsOfType(AlertType.deviceOffline);
+      await NotificationService().cancelAlert(AlertType.deviceOffline.name);
+      changed = true;
+    }
+
+    // If cold temp is nominal (2-8°C), auto-resolve temperature alerts!
+    if (reading.coldTemperatureC >= 2.0 && reading.coldTemperatureC <= 8.0) {
+      await repo.resolveAlertsOfType(AlertType.highTemp);
+      await repo.resolveAlertsOfType(AlertType.lowTemp);
+      await NotificationService().cancelAlert(AlertType.highTemp.name);
+      await NotificationService().cancelAlert(AlertType.lowTemp.name);
+      changed = true;
+    }
+
+    // If door is closed, auto-resolve door alerts!
+    if (!reading.coldDoorOpen) {
+      await repo.resolveAlertsOfType(AlertType.doorLeftOpen);
+      await NotificationService().cancelAlert(AlertType.doorLeftOpen.name);
+      changed = true;
+    }
+
+    // If sensor is healthy, auto-resolve sensor error alerts!
+    if (reading.sensorHealth == SensorHealth.healthy) {
+      await repo.resolveAlertsOfType(AlertType.sensorError);
+      await NotificationService().cancelAlert(AlertType.sensorError.name);
+      changed = true;
+    }
+
+    if (changed) {
+      await refresh();
+    }
   }
 
   Future<void> refresh() async {
     final repo = ref.read(alertRepositoryProvider);
     final alerts = await repo.getAlerts();
     state = AsyncValue.data(alerts);
+    _triggerLocalNotificationsForActive(alerts);
   }
 
   Future<void> acknowledge(String id) async {
@@ -380,7 +477,12 @@ class AlertsNotifier extends AsyncNotifier<List<AlertItem>> {
 
   Future<void> resolve(String id) async {
     final repo = ref.read(alertRepositoryProvider);
+    final currentList = state.value ?? [];
+    final matchingAlerts = currentList.where((a) => a.id == id).toList();
     await repo.resolveAlert(id);
+    if (matchingAlerts.isNotEmpty) {
+      await NotificationService().cancelAlert(matchingAlerts.first.type.name);
+    }
     await refresh();
   }
 
