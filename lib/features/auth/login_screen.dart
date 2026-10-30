@@ -96,19 +96,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   // App Emblem
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryContainer,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.mintAccent,
-                          width: 2,
-                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.health_and_safety_rounded,
-                        size: 44,
-                        color: AppColors.primary,
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/icons/app_icon.png',
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.mintAccent,
+                                width: 2,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.health_and_safety_rounded,
+                              size: 44,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
