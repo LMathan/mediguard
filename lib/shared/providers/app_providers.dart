@@ -468,25 +468,9 @@ class AlertsNotifier extends AsyncNotifier<List<AlertItem>> {
     });
 
     final alerts = await repo.getAlerts();
-    _triggerLocalNotificationsForActive(alerts);
+    // Do not trigger local push notifications on app launch / refresh.
+    // When the app is open, the user views active alerts directly on screen.
     return alerts;
-  }
-
-  void _triggerLocalNotificationsForActive(List<AlertItem> alerts) {
-    final seenTypes = <AlertType>{};
-    for (final alert in alerts) {
-      if (alert.isActive && alert.severity == AlertSeverity.critical) {
-        if (!seenTypes.add(alert.type)) {
-          // Suppress duplicate notification of the same alert type in this batch
-          continue;
-        }
-        NotificationService().showCriticalAlert(
-          alertKey: alert.type.name,
-          title: alert.title,
-          body: alert.message,
-        );
-      }
-    }
   }
 
   Future<void> autoResolveNominal(SensorReading reading) async {
@@ -532,7 +516,6 @@ class AlertsNotifier extends AsyncNotifier<List<AlertItem>> {
     final repo = ref.read(alertRepositoryProvider);
     final alerts = await repo.getAlerts();
     state = AsyncValue.data(alerts);
-    _triggerLocalNotificationsForActive(alerts);
   }
 
   Future<void> acknowledge(String id) async {

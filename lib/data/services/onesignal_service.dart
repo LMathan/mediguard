@@ -78,7 +78,9 @@ class OneSignalService {
           final mapped = AlertType.fromString(alertTypeStr);
           NotificationService().markAlertAsRecentlyNotified(mapped.name);
         }
-        event.notification.display();
+        // Suppress system push notification banner when app is open (foreground).
+        // The user can already see alerts directly in the app UI, avoiding duplicate/repeated push banners.
+        event.preventDefault();
       });
 
       _isInitialized = true;
