@@ -6,6 +6,7 @@ import '../../data/models/device_settings.dart';
 import '../../data/models/inventory_transaction.dart';
 import '../../data/models/medicine.dart';
 import '../../data/models/sensor_reading.dart';
+import '../../data/models/unregistered_medicine.dart';
 import '../../data/repositories/alert_repository.dart';
 import '../../data/repositories/medicine_repository.dart';
 import '../../data/repositories/sensor_repository.dart';
@@ -361,6 +362,71 @@ final filteredMedicinesProvider = Provider<List<Medicine>>((ref) {
     loading: () => [],
     error: (_, _) => [],
   );
+});
+
+// 8b. Unregistered Medicines Notifier & Provider
+class UnregisteredMedicinesNotifier
+    extends AsyncNotifier<List<UnregisteredMedicine>> {
+  RealtimeChannel? _realtimeChannel;
+
+  @override
+  Future<List<UnregisteredMedicine>> build() async {
+    final repo = ref.watch(medicineRepositoryProvider);
+    final supabase = ref.watch(supabaseServiceProvider);
+
+    if (supabase.client != null) {
+      _realtimeChannel?.unsubscribe();
+      _realtimeChannel = supabase.client!
+          .channel('public:unregistered_medicines')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'unregistered_medicines',
+            callback: (_) {
+              refresh();
+            },
+          )
+          .subscribe();
+
+      ref.onDispose(() {
+        if (_realtimeChannel != null && supabase.client != null) {
+          supabase.client!.removeChannel(_realtimeChannel!);
+        }
+      });
+    }
+
+    return await repo.getUnregisteredMedicines();
+  }
+
+  Future<void> refresh() async {
+    final repo = ref.read(medicineRepositoryProvider);
+    final list = await repo.getUnregisteredMedicines();
+    state = AsyncValue.data(list);
+  }
+
+  Future<void> consume({
+    required String rfidUid,
+    String? unregisteredId,
+  }) async {
+    final repo = ref.read(medicineRepositoryProvider);
+    await repo.consumeUnregisteredMedicine(
+      rfidUid: rfidUid,
+      unregisteredId: unregisteredId,
+    );
+    await refresh();
+  }
+}
+
+final unregisteredMedicinesProvider = AsyncNotifierProvider<
+  UnregisteredMedicinesNotifier,
+  List<UnregisteredMedicine>
+>(() {
+  return UnregisteredMedicinesNotifier();
+});
+
+final unregisteredMedicinesCountProvider = Provider<int>((ref) {
+  final list = ref.watch(unregisteredMedicinesProvider).value ?? [];
+  return list.length;
 });
 
 // 9. Alerts Notifiers

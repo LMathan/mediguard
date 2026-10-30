@@ -6,6 +6,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../data/models/medicine.dart';
 import '../../shared/providers/app_providers.dart';
+import 'widgets/unregistered_rfid_sheet.dart';
 
 class InventoryScreen extends ConsumerWidget {
   const InventoryScreen({super.key});
@@ -15,6 +16,7 @@ class InventoryScreen extends ConsumerWidget {
     final filteredMedicines = ref.watch(filteredMedicinesProvider);
     final filterState = ref.watch(inventoryFilterProvider);
     final medicinesAsync = ref.watch(medicineListProvider);
+    final unregisteredCount = ref.watch(unregisteredMedicinesCountProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -26,33 +28,172 @@ class InventoryScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Column(
               children: [
-                // Search Input Field
-                TextField(
-                  onChanged: (val) {
-                    ref
-                        .read(inventoryFilterProvider.notifier)
-                        .update(filterState.copyWith(searchQuery: val));
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search by medicine name, brand, or RFID UID...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: filterState.searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              ref
-                                  .read(inventoryFilterProvider.notifier)
-                                  .update(
-                                    filterState.copyWith(searchQuery: ''),
-                                  );
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
+                // Unregistered RFIDs Alert Banner (if pending)
+                if (unregisteredCount > 0)
+                  InkWell(
+                    onTap: () => UnregisteredRfidSheet.show(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        border: Border.all(color: const Color(0xFFF59E0B)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF59E0B),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.nfc_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '$unregisteredCount Unregistered RFID Tag${unregisteredCount > 1 ? 's' : ''} Detected',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF92400E),
+                                  ),
+                                ),
+                                const Text(
+                                  'Tap to select and register into inventory',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD97706),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Enroll',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 10,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+
+                // Search Input Field & Unregistered RFID Button
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        onChanged: (val) {
+                          ref
+                              .read(inventoryFilterProvider.notifier)
+                              .update(filterState.copyWith(searchQuery: val));
+                        },
+                        decoration: InputDecoration(
+                          hintText:
+                              'Search by name, brand, or RFID UID...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: filterState.searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    ref
+                                        .read(inventoryFilterProvider.notifier)
+                                        .update(
+                                          filterState.copyWith(searchQuery: ''),
+                                        );
+                                  },
+                                )
+                              : null,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Quick button to view and enroll unregistered RFIDs
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton.filledTonal(
+                          icon: const Icon(Icons.nfc_rounded, size: 20),
+                          tooltip: 'Unregistered RFID Tags',
+                          onPressed: () => UnregisteredRfidSheet.show(context),
+                          style: IconButton.styleFrom(
+                            backgroundColor: unregisteredCount > 0
+                                ? const Color(0xFFFEF3C7)
+                                : AppColors.surface,
+                            foregroundColor: unregisteredCount > 0
+                                ? const Color(0xFFD97706)
+                                : AppColors.primary,
+                          ),
+                        ),
+                        if (unregisteredCount > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFDC2626),
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                '$unregisteredCount',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
 

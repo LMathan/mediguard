@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/medicine.dart';
+import '../models/unregistered_medicine.dart';
 import '../services/supabase_service.dart';
 
 class MedicineRepository {
@@ -176,5 +177,54 @@ class MedicineRepository {
     }
 
     _inMemoryStore.removeWhere((m) => m.id == id);
+  }
+
+  /// Get pending unregistered RFIDs waiting for enrollment
+  Future<List<UnregisteredMedicine>> getUnregisteredMedicines() async {
+    final client = _supabaseService.client;
+    if (client != null) {
+      try {
+        final data = await client
+            .from('unregistered_medicines')
+            .select()
+            .eq('status', 'pending')
+            .order('last_scanned_at', ascending: false);
+        return (data as List)
+            .map((e) => UnregisteredMedicine.fromJson(e))
+            .toList();
+      } catch (e) {
+        debugPrint(
+          '[MedicineRepository] Error fetching unregistered medicines: $e',
+        );
+      }
+    }
+    return [];
+  }
+
+  /// Delete or remove an unregistered RFID record once it has been enrolled into inventory
+  Future<void> consumeUnregisteredMedicine({
+    required String rfidUid,
+    String? unregisteredId,
+  }) async {
+    final client = _supabaseService.client;
+    if (client != null) {
+      try {
+        if (unregisteredId != null && unregisteredId.isNotEmpty) {
+          await client
+              .from('unregistered_medicines')
+              .delete()
+              .eq('id', unregisteredId);
+        } else {
+          await client
+              .from('unregistered_medicines')
+              .delete()
+              .eq('rfid_uid', rfidUid);
+        }
+      } catch (e) {
+        debugPrint(
+          '[MedicineRepository] Error consuming unregistered medicine: $e',
+        );
+      }
+    }
   }
 }

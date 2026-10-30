@@ -98,7 +98,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/inventory/add',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const AddEditMedicineScreen(),
+        builder: (context, state) {
+          final rfid = state.uri.queryParameters['rfid'];
+          final unregisteredId = state.uri.queryParameters['unregisteredId'];
+          final compartment = state.uri.queryParameters['compartment'];
+          return AddEditMedicineScreen(
+            initialRfid: rfid,
+            unregisteredMedicineId: unregisteredId,
+            initialCompartment: compartment,
+          );
+        },
       ),
       GoRoute(
         path: '/inventory/edit/:id',

@@ -4,12 +4,22 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/medicine.dart';
+import '../../data/models/unregistered_medicine.dart';
 import '../../shared/providers/app_providers.dart';
 
 class AddEditMedicineScreen extends ConsumerStatefulWidget {
   final String? medicineId;
+  final String? initialRfid;
+  final String? unregisteredMedicineId;
+  final String? initialCompartment;
 
-  const AddEditMedicineScreen({super.key, this.medicineId});
+  const AddEditMedicineScreen({
+    super.key,
+    this.medicineId,
+    this.initialRfid,
+    this.unregisteredMedicineId,
+    this.initialCompartment,
+  });
 
   @override
   ConsumerState<AddEditMedicineScreen> createState() =>
@@ -34,12 +44,25 @@ class _AddEditMedicineScreenState extends ConsumerState<AddEditMedicineScreen> {
   StorageRequirement _storageRequirement = StorageRequirement.normal;
   CompartmentType _compartment = CompartmentType.normal;
   bool _isLoading = false;
+  String? _unregisteredId;
 
   @override
   void initState() {
     super.initState();
+    _unregisteredId = widget.unregisteredMedicineId;
     if (widget.medicineId != null) {
       _loadExistingMedicine();
+    } else {
+      if (widget.initialRfid != null && widget.initialRfid!.isNotEmpty) {
+        _rfidController.text = widget.initialRfid!;
+      }
+      if (widget.initialCompartment == 'cold') {
+        _compartment = CompartmentType.cold;
+        _storageRequirement = StorageRequirement.cold;
+      } else if (widget.initialCompartment == 'normal') {
+        _compartment = CompartmentType.normal;
+        _storageRequirement = StorageRequirement.normal;
+      }
     }
   }
 
@@ -88,7 +111,107 @@ class _AddEditMedicineScreenState extends ConsumerState<AddEditMedicineScreen> {
         .toUpperCase();
     setState(() {
       _rfidController.text = 'E2801$hex';
+      _unregisteredId = null;
     });
+  }
+
+  Future<void> _pickFromUnregisteredTags(BuildContext context) async {
+    final list = ref.read(unregisteredMedicinesProvider).value ?? [];
+    if (list.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No unregistered tags waiting in queue. Scan a tag on your hardware unit first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final selected = await showModalBottomSheet<UnregisteredMedicine>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select Scanned RFID Tag',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Tap any detected tag to populate its UID and compartment:',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.5,
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: list.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (ctx, i) {
+                  final item = list[i];
+                  final isCold = item.compartment.toLowerCase() == 'cold';
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFFE0F2FE),
+                      child: Icon(
+                        Icons.nfc_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      item.rfidUid,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Detected ${item.scanCount}x • ${isCold ? '❄️ Cold Zone' : '🌿 Normal Zone'}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () => Navigator.of(ctx).pop(item),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selected != null) {
+      setState(() {
+        _rfidController.text = selected.rfidUid;
+        _unregisteredId = selected.id;
+        if (selected.compartment.toLowerCase() == 'cold') {
+          _compartment = CompartmentType.cold;
+          _storageRequirement = StorageRequirement.cold;
+        } else if (selected.compartment.toLowerCase() == 'normal') {
+          _compartment = CompartmentType.normal;
+          _storageRequirement = StorageRequirement.normal;
+        }
+      });
+    }
   }
 
   Future<void> _pickExpiryDate() async {
@@ -185,6 +308,13 @@ class _AddEditMedicineScreenState extends ConsumerState<AddEditMedicineScreen> {
         await ref.read(medicineListProvider.notifier).updateMedicine(medicine);
       } else {
         await ref.read(medicineListProvider.notifier).addMedicine(medicine);
+        // If this medicine was enrolled with an RFID tag, remove it from unregistered_medicines table
+        if (medicine.rfidUid != null && medicine.rfidUid!.isNotEmpty) {
+          await ref.read(unregisteredMedicinesProvider.notifier).consume(
+                rfidUid: medicine.rfidUid!,
+                unregisteredId: _unregisteredId,
+              );
+        }
       }
 
       if (mounted) {
@@ -220,6 +350,54 @@ class _AddEditMedicineScreenState extends ConsumerState<AddEditMedicineScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Enrolling Unregistered Tag Banner (if enrolling)
+              if (_unregisteredId != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    border: Border.all(color: const Color(0xFF16A34A)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: Color(0xFF16A34A),
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Enrolling Detected RFID Tag',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF15803D),
+                              ),
+                            ),
+                            Text(
+                              'Tag UID: ${_rfidController.text}. It will be moved to your active inventory upon saving.',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF166534),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+
               // Section 1: Basic Information
               const Text(
                 '1. Identification & Clinical Info',
@@ -325,7 +503,21 @@ class _AddEditMedicineScreenState extends ConsumerState<AddEditMedicineScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
+              // Action to select from scanned unregistered tags
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _pickFromUnregisteredTags(context),
+                  icon: const Icon(Icons.playlist_add_check, size: 18),
+                  label: const Text('Select from Unregistered Scans'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
 
               Row(
                 children: [
