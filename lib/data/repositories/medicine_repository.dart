@@ -214,7 +214,8 @@ class MedicineRepository {
               .from('unregistered_medicines')
               .delete()
               .eq('id', unregisteredId);
-        } else {
+        }
+        if (rfidUid.isNotEmpty) {
           await client
               .from('unregistered_medicines')
               .delete()

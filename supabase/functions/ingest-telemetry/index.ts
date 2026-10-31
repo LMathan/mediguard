@@ -111,6 +111,91 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // 4a. Special Event: RFID Scan Handling
+  if (payload.event_type === "rfid_scan") {
+    const rawUid = payload.rfid_uid || "";
+    const cleanUid = rawUid.toString().trim().toUpperCase();
+
+    if (!cleanUid) {
+      return new Response(
+        JSON.stringify({ error: "Missing or empty 'rfid_uid' in rfid_scan payload." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const compartment = payload.compartment === "normal" ? "normal" : "cold";
+    console.log(`[RFID] Processing scan event: UID=${cleanUid}, Compartment=${compartment}, Device=${device.id}`);
+
+    // Check if this UID is registered in medicines
+    const { data: existingMed, error: medError } = await supabase
+      .from("medicines")
+      .select("id, name, compartment, status")
+      .eq("rfid_uid", cleanUid)
+      .neq("status", "removed")
+      .maybeSingle();
+
+    if (medError) {
+      console.error("[RFID] Error querying medicines table:", medError);
+    }
+
+    if (existingMed && existingMed.name) {
+      console.log(`[RFID] Registered medicine recognized: '${existingMed.name}' (${cleanUid})`);
+      return new Response(
+        JSON.stringify({
+          status: "registered",
+          registered: true,
+          medicine_name: existingMed.name,
+          compartment: existingMed.compartment || compartment,
+          rfid_uid: cleanUid,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // UID is NOT registered: Save to public.unregistered_medicines
+    const nowIso = new Date().toISOString();
+
+    const { data: existingUnreg } = await supabase
+      .from("unregistered_medicines")
+      .select("id, scan_count")
+      .eq("rfid_uid", cleanUid)
+      .maybeSingle();
+
+    const newScanCount = existingUnreg ? (Number(existingUnreg.scan_count) || 1) + 1 : 1;
+
+    const { error: unregError } = await supabase
+      .from("unregistered_medicines")
+      .upsert({
+        rfid_uid: cleanUid,
+        compartment: compartment,
+        device_id: device.serial_number || device.id || "mediguard-container-01",
+        status: "pending",
+        scan_count: newScanCount,
+        last_scanned_at: nowIso,
+      }, { onConflict: "rfid_uid" });
+
+    if (unregError) {
+      console.error("[RFID] Failed to insert/update unregistered_medicines:", unregError);
+      return new Response(
+        JSON.stringify({ error: "Failed to store unregistered RFID tag: " + unregError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[RFID] Successfully logged unregistered tag ${cleanUid} to public.unregistered_medicines`);
+
+    return new Response(
+      JSON.stringify({
+        status: "unregistered",
+        registered: false,
+        message: "Invalid ID - Logged to unregistered medicines for mobile app enrollment",
+        rfid_uid: cleanUid,
+        compartment: compartment,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   // Validate Required Fields & Ranges
   const normalTemp = Number(payload.normal_temperature_c);
   const normalHum = Number(payload.normal_humidity_pct);
