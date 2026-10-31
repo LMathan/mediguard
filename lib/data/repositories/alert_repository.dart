@@ -16,16 +16,20 @@ class AlertRepository {
   }) : _supabaseService = supabaseService ?? SupabaseService(),
        _notificationService = notificationService ?? NotificationService();
 
-  Future<List<AlertItem>> getAlerts() async {
+  Future<List<AlertItem>> getAlerts({String? deviceId}) async {
     final client = _supabaseService.client;
     final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
-        final data = await client
-            .from('alerts')
-            .select()
-            .eq('user_id', userId)
+        var query = client.from('alerts').select();
+        if (deviceId != null) {
+          query = query.eq('device_id', deviceId);
+        } else if (userId != null) {
+          query = query.eq('user_id', userId);
+        }
+
+        final data = await query
             .order('created_at', ascending: false)
             .limit(50);
         return (data as List).map((e) => AlertItem.fromJson(e)).toList();
@@ -37,8 +41,8 @@ class AlertRepository {
     return List.unmodifiable(_inMemoryAlerts);
   }
 
-  Future<List<AlertItem>> getActiveAlerts() async {
-    final all = await getAlerts();
+  Future<List<AlertItem>> getActiveAlerts({String? deviceId}) async {
+    final all = await getAlerts(deviceId: deviceId);
     return all.where((a) => a.status == AlertStatus.active).toList();
   }
 
@@ -95,9 +99,8 @@ class AlertRepository {
 
   Future<void> acknowledgeAlert(String id) async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
         await client
             .from('alerts')
@@ -105,8 +108,7 @@ class AlertRepository {
               'status': 'acknowledged',
               'acknowledged_at': DateTime.now().toIso8601String(),
             })
-            .eq('id', id)
-            .eq('user_id', userId);
+            .eq('id', id);
       } catch (e) {
         debugPrint('[AlertRepository] Error acknowledging alert: $e');
       }
@@ -123,9 +125,8 @@ class AlertRepository {
 
   Future<void> resolveAlert(String id) async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
         await client
             .from('alerts')
@@ -133,8 +134,7 @@ class AlertRepository {
               'status': 'resolved',
               'resolved_at': DateTime.now().toIso8601String(),
             })
-            .eq('id', id)
-            .eq('user_id', userId);
+            .eq('id', id);
       } catch (e) {
         debugPrint('[AlertRepository] Error resolving alert: $e');
       }
@@ -168,9 +168,8 @@ class AlertRepository {
 
   Future<void> resolveAlertsOfType(AlertType type) async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
         final dbValues = _matchingDbValues(type);
         await client
@@ -179,7 +178,6 @@ class AlertRepository {
               'status': 'resolved',
               'resolved_at': DateTime.now().toIso8601String(),
             })
-            .eq('user_id', userId)
             .inFilter('type', dbValues)
             .eq('status', 'active');
       } catch (e) {

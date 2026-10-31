@@ -60,7 +60,7 @@ class HardwareSensorService implements SensorDataSource {
 
     try {
       // Subscribe to Realtime Postgres Changes
-      final channelName = 'public:sensor_readings:${userId ?? deviceId ?? 'all'}';
+      final channelName = 'public:sensor_readings:${deviceId ?? userId ?? 'all'}';
       _subscription = supabase!
           .channel(channelName)
           .onPostgresChanges(
@@ -71,10 +71,10 @@ class HardwareSensorService implements SensorDataSource {
               try {
                 final reading = SensorReading.fromJson(payload.newRecord);
                 // Verify relevance
-                if (userId != null && payload.newRecord['user_id'] != userId) {
+                if (deviceId != null && payload.newRecord['device_id'] != deviceId) {
                   return;
                 }
-                if (deviceId != null && payload.newRecord['device_id'] != deviceId) {
+                if (deviceId == null && userId != null && payload.newRecord['user_id'] != userId) {
                   return;
                 }
                 _hasReadings = true;
@@ -99,11 +99,10 @@ class HardwareSensorService implements SensorDataSource {
     try {
       var query = supabase!.from('sensor_readings').select();
 
-      if (userId != null) {
-        query = query.eq('user_id', userId!);
-      }
       if (deviceId != null) {
         query = query.eq('device_id', deviceId!);
+      } else if (userId != null) {
+        query = query.eq('user_id', userId!);
       }
 
       final response = await query

@@ -17,17 +17,18 @@ class SensorRepository {
     final client = _supabaseService.client;
     final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
         final cutoff = DateTime.now().subtract(window).toIso8601String();
         var filter = client
             .from('sensor_readings')
             .select()
-            .eq('user_id', userId)
             .gte('recorded_at', cutoff);
 
         if (deviceId != null) {
           filter = filter.eq('device_id', deviceId);
+        } else if (userId != null) {
+          filter = filter.eq('user_id', userId);
         }
 
         final data = await filter

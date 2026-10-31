@@ -12,18 +12,21 @@ class MedicineRepository {
   MedicineRepository({SupabaseService? supabaseService})
     : _supabaseService = supabaseService ?? SupabaseService();
 
-  Future<List<Medicine>> getMedicines() async {
+  Future<List<Medicine>> getMedicines({String? deviceId}) async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
-        final data = await client
+        var query = client
             .from('medicines')
             .select()
-            .eq('user_id', userId)
-            .neq('status', 'removed')
-            .order('name');
+            .neq('status', 'removed');
+
+        if (deviceId != null) {
+          query = query.eq('device_id', deviceId);
+        }
+
+        final data = await query.order('name');
         return (data as List).map((e) => Medicine.fromJson(e)).toList();
       } catch (e) {
         debugPrint('[MedicineRepository] Supabase fetch error: $e');
@@ -31,20 +34,22 @@ class MedicineRepository {
       }
     }
 
-    return List.unmodifiable(_inMemoryStore.where((m) => m.status != MedicineStatus.removed));
+    return List.unmodifiable(
+      _inMemoryStore.where((m) =>
+          m.status != MedicineStatus.removed &&
+          (deviceId == null || m.deviceId == deviceId)),
+    );
   }
 
   Future<Medicine?> getMedicineById(String id) async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
         final data = await client
             .from('medicines')
             .select()
             .eq('id', id)
-            .eq('user_id', userId)
             .maybeSingle();
         if (data != null) return Medicine.fromJson(data);
       } catch (e) {
@@ -59,19 +64,22 @@ class MedicineRepository {
     }
   }
 
-  Future<Medicine?> getMedicineByRfid(String rfidUid) async {
+  Future<Medicine?> getMedicineByRfid(String rfidUid, {String? deviceId}) async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
-        final data = await client
+        var query = client
             .from('medicines')
             .select()
             .eq('rfid_uid', rfidUid)
-            .eq('user_id', userId)
-            .neq('status', 'removed')
-            .maybeSingle();
+            .neq('status', 'removed');
+
+        if (deviceId != null) {
+          query = query.eq('device_id', deviceId);
+        }
+
+        final data = await query.maybeSingle();
         if (data != null) return Medicine.fromJson(data);
       } catch (e) {
         debugPrint('[MedicineRepository] Error querying RFID: $e');
@@ -80,29 +88,38 @@ class MedicineRepository {
 
     try {
       return _inMemoryStore.firstWhere(
-        (m) => m.rfidUid == rfidUid && m.status != MedicineStatus.removed,
+        (m) =>
+            m.rfidUid == rfidUid &&
+            m.status != MedicineStatus.removed &&
+            (deviceId == null || m.deviceId == deviceId),
       );
     } catch (_) {
       return null;
     }
   }
 
-  Future<Medicine> addMedicine(Medicine medicine) async {
+  Future<Medicine> addMedicine(Medicine medicine, {String? deviceId}) async {
+    final targetDeviceId = medicine.deviceId ?? deviceId;
     final medWithId = medicine.id.isEmpty
-        ? medicine.copyWith(id: _uuid.v4())
-        : medicine;
+        ? medicine.copyWith(id: _uuid.v4(), deviceId: targetDeviceId)
+        : medicine.copyWith(deviceId: targetDeviceId);
 
     final client = _supabaseService.client;
     final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
-      final payload = medWithId.toJson(userId: userId);
+    if (client != null) {
+      final payload = medWithId.toJson(
+        userId: userId,
+        deviceId: targetDeviceId,
+      );
       final res = await client
           .from('medicines')
           .insert(payload)
           .select()
           .single();
-      return Medicine.fromJson(res);
+      final created = Medicine.fromJson(res);
+      _inMemoryStore.add(created);
+      return created;
     }
 
     _inMemoryStore.add(medWithId);
@@ -115,16 +132,21 @@ class MedicineRepository {
     final client = _supabaseService.client;
     final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       final payload = updated.toJson(userId: userId);
       final res = await client
           .from('medicines')
           .update(payload)
           .eq('id', updated.id)
-          .eq('user_id', userId)
           .select()
           .single();
-      return Medicine.fromJson(res);
+      final saved = Medicine.fromJson(res);
+
+      final index = _inMemoryStore.indexWhere((m) => m.id == updated.id);
+      if (index != -1) {
+        _inMemoryStore[index] = saved;
+      }
+      return saved;
     }
 
     final index = _inMemoryStore.indexWhere((m) => m.id == updated.id);
@@ -140,9 +162,8 @@ class MedicineRepository {
     required MedicineStatus newStatus,
   }) async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       await client
           .from('medicines')
           .update({
@@ -150,8 +171,7 @@ class MedicineRepository {
             'status': newStatus.dbValue,
             'updated_at': DateTime.now().toIso8601String(),
           })
-          .eq('id', id)
-          .eq('user_id', userId);
+          .eq('id', id);
     }
 
     final index = _inMemoryStore.indexWhere((m) => m.id == id);
@@ -166,14 +186,12 @@ class MedicineRepository {
 
   Future<void> deleteMedicine(String id) async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       await client
           .from('medicines')
           .delete()
-          .eq('id', id)
-          .eq('user_id', userId);
+          .eq('id', id);
     }
 
     _inMemoryStore.removeWhere((m) => m.id == id);

@@ -70,15 +70,78 @@ class SettingsRepository {
     return _cachedSettings;
   }
 
-  Future<DeviceInfo> getDeviceInfo() async {
+  Future<List<DeviceInfo>> getDevices() async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
+
+    if (client != null) {
+      try {
+        final data = await client
+            .from('devices')
+            .select()
+            .order('created_at', ascending: true);
+
+        final list = (data as List).map((e) => DeviceInfo.fromJson(e)).toList();
+        if (list.isNotEmpty) {
+          return list;
+        }
+      } catch (e) {
+        debugPrint('[SettingsRepository] Error loading devices: $e');
+      }
+    }
+
+    return [
+      _cachedDevice,
+      DeviceInfo(
+        id: 'd1b54f87-2f7b-45a7-8554-de66122a0fbf',
+        deviceName: 'MediGuard ICU Unit Beta',
+        modelVersion: 'ESP32-MediGuard-v1',
+        serialNumber: 'mediguard-container-02',
+        isOnline: true,
+        dataSource: DataSourceType.hardware,
+        createdAt: DateTime.now().subtract(const Duration(days: 10)),
+      ),
+    ];
+  }
+
+  Future<DeviceInfo?> getDeviceById(String id) async {
+    final client = _supabaseService.client;
+    if (client != null) {
+      try {
+        final data = await client
+            .from('devices')
+            .select()
+            .eq('id', id)
+            .maybeSingle();
+        if (data != null) {
+          return DeviceInfo.fromJson(data);
+        }
+      } catch (e) {
+        debugPrint('[SettingsRepository] Error fetching device $id: $e');
+      }
+    }
+    if (_cachedDevice.id == id) return _cachedDevice;
+    if (id == 'd1b54f87-2f7b-45a7-8554-de66122a0fbf') {
+      return DeviceInfo(
+        id: 'd1b54f87-2f7b-45a7-8554-de66122a0fbf',
+        deviceName: 'MediGuard ICU Unit Beta',
+        modelVersion: 'ESP32-MediGuard-v1',
+        serialNumber: 'mediguard-container-02',
+        isOnline: true,
+        dataSource: DataSourceType.hardware,
+        createdAt: DateTime.now().subtract(const Duration(days: 10)),
+      );
+    }
+    return null;
+  }
+
+  Future<DeviceInfo> getDeviceInfo({String? deviceId}) async {
+    final client = _supabaseService.client;
 
     if (client != null) {
       try {
         var query = client.from('devices').select();
-        if (userId != null) {
-          query = query.eq('user_id', userId);
+        if (deviceId != null) {
+          query = query.eq('id', deviceId);
         }
         final data = await query
             .order('last_seen_at', ascending: false)

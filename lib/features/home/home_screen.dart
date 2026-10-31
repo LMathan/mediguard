@@ -37,7 +37,9 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: () async {
+          ref.invalidate(devicesListProvider);
           await ref.read(hardwareSensorServiceProvider).fetchLatest();
+          await ref.read(medicineListProvider.notifier).refresh();
           await ref.read(alertsProvider.notifier).refresh();
           await ref.read(transactionsProvider.notifier).refresh();
         },
@@ -47,7 +49,11 @@ class HomeScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // System Health Summary Card
+              // 1. Storage Unit / Container Dropdown Selector
+              _buildDeviceSelector(context, ref),
+              const SizedBox(height: 14),
+
+              // 2. System Health Summary Card
               Container(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
@@ -418,6 +424,196 @@ class HomeScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceSelector(BuildContext context, WidgetRef ref) {
+    final devicesAsync = ref.watch(devicesListProvider);
+    final selectedId = ref.watch(selectedDeviceIdProvider);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.view_in_ar_rounded,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'STORAGE UNIT / CONTAINER',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.9,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF16A34A),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'Live Linked',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF166534),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          devicesAsync.when(
+            data: (devices) {
+              if (devices.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    'No containers available',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                );
+              }
+
+              final currentSelection = devices.any((d) => d.id == selectedId)
+                  ? selectedId
+                  : devices.first.id;
+
+              return DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: currentSelection,
+                  icon: const Icon(
+                    Icons.arrow_drop_down_circle_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  itemHeight: 52,
+                  borderRadius: BorderRadius.circular(12),
+                  items: devices.map((device) {
+                    final isCurrent = device.id == currentSelection;
+                    return DropdownMenuItem<String>(
+                      value: device.id,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: device.isOnline
+                                  ? const Color(0xFF16A34A)
+                                  : Colors.grey,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  device.deviceName,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: isCurrent
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                    color: isCurrent
+                                        ? AppColors.primary
+                                        : AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (device.serialNumber != null)
+                                  Text(
+                                    device.serialNumber!,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (newId) {
+                    if (newId != null && newId != selectedId) {
+                      ref
+                          .read(selectedDeviceIdProvider.notifier)
+                          .selectDevice(newId);
+                      ref.read(hardwareSensorServiceProvider).fetchLatest();
+                    }
+                  },
+                ),
+              );
+            },
+            loading: () => const SizedBox(
+              height: 38,
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (_, _) => const Text(
+              'Failed to load devices',
+              style: TextStyle(fontSize: 12, color: AppColors.statusCritical),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -17,6 +17,7 @@ class InventoryScreen extends ConsumerWidget {
     final filterState = ref.watch(inventoryFilterProvider);
     final medicinesAsync = ref.watch(medicineListProvider);
     final unregisteredCount = ref.watch(unregisteredMedicinesCountProvider);
+    final selectedDevice = ref.watch(selectedDeviceInfoProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -28,6 +29,42 @@ class InventoryScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Column(
               children: [
+                // Active Container Banner
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.view_in_ar_rounded,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Active Unit: ${selectedDevice?.deviceName ?? "MediGuard Smart Box Alpha"}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
                 // Unregistered RFIDs Alert Banner (if pending)
                 if (unregisteredCount > 0)
                   InkWell(

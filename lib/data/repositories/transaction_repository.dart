@@ -19,14 +19,12 @@ class TransactionRepository {
 
   Future<List<InventoryTransaction>> getTransactions() async {
     final client = _supabaseService.client;
-    final userId = _supabaseService.currentUserId;
 
-    if (client != null && userId != null) {
+    if (client != null) {
       try {
         final data = await client
             .from('inventory_transactions')
             .select('*, medicines(name)')
-            .eq('user_id', userId)
             .order('initiated_at', ascending: false)
             .limit(50);
         return (data as List)

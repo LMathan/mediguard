@@ -37,11 +37,52 @@ final oneSignalServiceProvider = Provider<OneSignalService>((ref) {
   return OneSignalService();
 });
 
+// 1b. Device Selection & Management Providers
+final devicesListProvider = FutureProvider<List<DeviceInfo>>((ref) async {
+  final repo = ref.watch(settingsRepositoryProvider);
+  return await repo.getDevices();
+});
+
+class SelectedDeviceNotifier extends Notifier<String> {
+  String? _userChosenDeviceId;
+
+  @override
+  String build() {
+    final devicesAsync = ref.watch(devicesListProvider);
+    final devices = devicesAsync.value ?? [];
+    if (_userChosenDeviceId != null &&
+        devices.any((d) => d.id == _userChosenDeviceId)) {
+      return _userChosenDeviceId!;
+    }
+    if (devices.isNotEmpty) {
+      return devices.first.id;
+    }
+    return 'c0b54f87-1f7b-45a7-8554-de66122a0fbe';
+  }
+
+  void selectDevice(String deviceId) {
+    _userChosenDeviceId = deviceId;
+    state = deviceId;
+  }
+}
+
+final selectedDeviceIdProvider =
+    NotifierProvider<SelectedDeviceNotifier, String>(() {
+      return SelectedDeviceNotifier();
+    });
+
+final selectedDeviceInfoProvider = Provider<DeviceInfo?>((ref) {
+  final selectedId = ref.watch(selectedDeviceIdProvider);
+  final devices = ref.watch(devicesListProvider).value ?? [];
+  return devices.where((d) => d.id == selectedId).firstOrNull;
+});
+
 final hardwareSensorServiceProvider = Provider<HardwareSensorService>((ref) {
   final supabase = ref.watch(supabaseServiceProvider);
+  final selectedDeviceId = ref.watch(selectedDeviceIdProvider);
   final service = HardwareSensorService(
     supabase: supabase.client,
-    userId: supabase.currentUserId,
+    deviceId: selectedDeviceId,
   );
   service.initialize();
   ref.onDispose(() {
@@ -129,17 +170,21 @@ final deviceSettingsProvider =
 class DeviceInfoNotifier extends AsyncNotifier<DeviceInfo> {
   @override
   Future<DeviceInfo> build() async {
-    // Re-fetch when auth state changes
+    // Re-fetch when auth state or selected device changes
     ref.watch(authStateStreamProvider);
+    final selectedDeviceId = ref.watch(selectedDeviceIdProvider);
     final repo = ref.watch(settingsRepositoryProvider);
-    return await repo.getDeviceInfo();
+    final dev = await repo.getDeviceById(selectedDeviceId);
+    return dev ?? await repo.getDeviceInfo(deviceId: selectedDeviceId);
   }
 
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     try {
+      final selectedDeviceId = ref.read(selectedDeviceIdProvider);
       final repo = ref.read(settingsRepositoryProvider);
-      final info = await repo.getDeviceInfo();
+      final dev = await repo.getDeviceById(selectedDeviceId);
+      final info = dev ?? await repo.getDeviceInfo(deviceId: selectedDeviceId);
       state = AsyncValue.data(info);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -173,7 +218,8 @@ final sensorReadingStreamProvider = StreamProvider<SensorReading>((ref) {
 final sensorHistoryProvider =
     FutureProvider.family<List<SensorReading>, Duration>((ref, window) async {
       final repo = ref.watch(sensorRepositoryProvider);
-      return await repo.getHistory(window: window);
+      final selectedDeviceId = ref.watch(selectedDeviceIdProvider);
+      return await repo.getHistory(window: window, deviceId: selectedDeviceId);
     });
 
 // 7. Overall System Status Provider
@@ -266,15 +312,17 @@ final inventoryFilterProvider =
 class MedicineListNotifier extends AsyncNotifier<List<Medicine>> {
   @override
   Future<List<Medicine>> build() async {
+    final selectedDeviceId = ref.watch(selectedDeviceIdProvider);
     final repo = ref.watch(medicineRepositoryProvider);
-    return await repo.getMedicines();
+    return await repo.getMedicines(deviceId: selectedDeviceId);
   }
 
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     try {
+      final selectedDeviceId = ref.read(selectedDeviceIdProvider);
       final repo = ref.read(medicineRepositoryProvider);
-      final list = await repo.getMedicines();
+      final list = await repo.getMedicines(deviceId: selectedDeviceId);
       state = AsyncValue.data(list);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -282,8 +330,12 @@ class MedicineListNotifier extends AsyncNotifier<List<Medicine>> {
   }
 
   Future<void> addMedicine(Medicine med) async {
+    final selectedDeviceId = ref.read(selectedDeviceIdProvider);
     final repo = ref.read(medicineRepositoryProvider);
-    await repo.addMedicine(med);
+    final medWithDevice = med.deviceId == null
+        ? med.copyWith(deviceId: selectedDeviceId)
+        : med;
+    await repo.addMedicine(medWithDevice, deviceId: selectedDeviceId);
     await refresh();
   }
 
@@ -435,13 +487,14 @@ class AlertsNotifier extends AsyncNotifier<List<AlertItem>> {
 
   @override
   Future<List<AlertItem>> build() async {
+    final selectedDeviceId = ref.watch(selectedDeviceIdProvider);
     final repo = ref.watch(alertRepositoryProvider);
     final supabase = ref.watch(supabaseServiceProvider);
 
     if (supabase.client != null) {
       _alertsChannel?.unsubscribe();
       _alertsChannel = supabase.client!
-          .channel('public:alerts:${supabase.currentUserId ?? 'all'}')
+          .channel('public:alerts:$selectedDeviceId')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
@@ -467,7 +520,7 @@ class AlertsNotifier extends AsyncNotifier<List<AlertItem>> {
       }
     });
 
-    final alerts = await repo.getAlerts();
+    final alerts = await repo.getAlerts(deviceId: selectedDeviceId);
     // Do not trigger local push notifications on app launch / refresh.
     // When the app is open, the user views active alerts directly on screen.
     return alerts;
@@ -513,8 +566,9 @@ class AlertsNotifier extends AsyncNotifier<List<AlertItem>> {
   }
 
   Future<void> refresh() async {
+    final selectedDeviceId = ref.read(selectedDeviceIdProvider);
     final repo = ref.read(alertRepositoryProvider);
-    final alerts = await repo.getAlerts();
+    final alerts = await repo.getAlerts(deviceId: selectedDeviceId);
     state = AsyncValue.data(alerts);
   }
 
