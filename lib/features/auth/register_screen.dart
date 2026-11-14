@@ -211,6 +211,41 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         )
                       : const Text('Create Clinician Account'),
                 ),
+                const SizedBox(height: 28),
+                const Divider(color: AppColors.border, height: 1),
+                const SizedBox(height: 20),
+
+                // 5ZEN Technologies Branding Footer
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'POWERED BY',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                          color: AppColors.textSecondary.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Image.asset(
+                        'assets/icons/company-logo.png',
+                        height: 30,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => const Text(
+                          '5ZEN TECHNOLOGIES',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

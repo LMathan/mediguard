@@ -315,7 +315,79 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
+
+            // Developer & Organization Branding Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.verified_outlined,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'ENGINEERED & DEVELOPED BY',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: AppColors.textSecondary.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Image.asset(
+                    'assets/icons/company-logo.png',
+                    height: 46,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const Text(
+                      '5ZEN TECHNOLOGIES',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Divider(color: AppColors.border, height: 1),
+                  const SizedBox(height: 12),
+                  _buildSettingRow('System', 'MediGuard Smart Storage Platform'),
+                  const SizedBox(height: 8),
+                  _buildSettingRow('Developer', '5ZEN Technologies'),
+                  const SizedBox(height: 8),
+                  _buildSettingRow('Version', 'v1.0.0 (Production Release)'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // Sign Out Button
             OutlinedButton.icon(

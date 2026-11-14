@@ -16,6 +16,7 @@ import '../../features/monitoring/monitoring_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/settings/simulation_controls_screen.dart';
 import '../../features/settings/threshold_settings_screen.dart';
+import '../../features/splash/splash_screen.dart';
 import '../../shared/providers/app_providers.dart';
 import '../../shared/widgets/app_scaffold_with_nav_bar.dart';
 
@@ -36,9 +37,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: supabase.isAuthenticated ? '/home' : '/login',
+    initialLocation: '/splash',
     refreshListenable: supabase,
     redirect: (context, state) {
+      // Allow splash screen to display initial animation and branding
+      if (state.matchedLocation == '/splash') {
+        return null;
+      }
+
       final isAuth = supabase.isAuthenticated;
       final isLoggingIn =
           state.matchedLocation == '/login' ||
@@ -55,6 +61,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // Splash Route
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+
       // Auth Routes
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
