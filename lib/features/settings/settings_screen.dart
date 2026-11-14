@@ -397,9 +397,77 @@ class SettingsScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               onPressed: () async {
-                await ref.read(supabaseServiceProvider).signOut();
-                if (context.mounted) {
-                  context.go('/login');
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Row(
+                      children: [
+                        Icon(
+                          Icons.logout_rounded,
+                          color: AppColors.statusCritical,
+                          size: 24,
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          'Confirm Sign Out',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    content: const Text(
+                      'Are you sure you want to sign out of MediGuard? You will need to log in again to access and manage your medical containers.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.statusCritical,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text(
+                          'Sign Out',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true && context.mounted) {
+                  await ref.read(supabaseServiceProvider).signOut();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
                 }
               },
               icon: const Icon(Icons.logout),
