@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/models/risk_assessment.dart';
 import '../theme/app_colors.dart';
 
 class CompartmentMetricCard extends StatelessWidget {
@@ -11,6 +12,9 @@ class CompartmentMetricCard extends StatelessWidget {
   final bool isFanActive;
   final bool isCold;
   final bool isWithinRange;
+  final bool isLightDetected;
+  final RiskLevel? riskLevel;
+  final double? riskScore;
 
   const CompartmentMetricCard({
     super.key,
@@ -23,6 +27,9 @@ class CompartmentMetricCard extends StatelessWidget {
     this.isFanActive = false,
     required this.isCold,
     required this.isWithinRange,
+    this.isLightDetected = false,
+    this.riskLevel,
+    this.riskScore,
   });
 
   @override
@@ -93,6 +100,46 @@ class CompartmentMetricCard extends StatelessWidget {
                   ],
                 ),
               ),
+
+              // Compartment Risk Badge
+              if (riskLevel != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: riskLevel!.bgColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: riskLevel!.color.withValues(alpha: 0.3),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: riskLevel!.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        riskLevel!.label.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: riskLevel!.color,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+
               // Door Status Chip
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -132,14 +179,14 @@ class CompartmentMetricCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Primary Readings Row
+          // Primary Readings Row (Temperature, Humidity, LDR Light Sensor)
           Row(
             children: [
-              // Temperature
+              // 1. Temperature
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                    horizontal: 10,
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
@@ -152,10 +199,10 @@ class CompartmentMetricCard extends StatelessWidget {
                       const Text(
                         'TEMPERATURE',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0.4,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -166,7 +213,7 @@ class CompartmentMetricCard extends StatelessWidget {
                           Text(
                             temperature.toStringAsFixed(1),
                             style: TextStyle(
-                              fontSize: 22,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: isWithinRange
                                   ? AppColors.textPrimary
@@ -176,7 +223,7 @@ class CompartmentMetricCard extends StatelessWidget {
                           const Text(
                             ' °C',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textSecondary,
                             ),
@@ -187,12 +234,13 @@ class CompartmentMetricCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              // Humidity
+              const SizedBox(width: 8),
+
+              // 2. Humidity
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                    horizontal: 10,
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
@@ -205,10 +253,10 @@ class CompartmentMetricCard extends StatelessWidget {
                       const Text(
                         'HUMIDITY',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0.4,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -219,7 +267,7 @@ class CompartmentMetricCard extends StatelessWidget {
                           Text(
                             humidity.toStringAsFixed(0),
                             style: const TextStyle(
-                              fontSize: 22,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textPrimary,
                             ),
@@ -227,7 +275,7 @@ class CompartmentMetricCard extends StatelessWidget {
                           const Text(
                             ' %',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textSecondary,
                             ),
@@ -238,11 +286,84 @@ class CompartmentMetricCard extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+
+              // 3. Light Sensor (LDR Module)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isLightDetected
+                        ? const Color(0xFFFEF3C7)
+                        : AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(12),
+                    border: isLightDetected
+                        ? Border.all(color: const Color(0xFFF59E0B), width: 1)
+                        : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isLightDetected
+                                ? Icons.wb_sunny_rounded
+                                : Icons.nightlight_round,
+                            size: 11,
+                            color: isLightDetected
+                                ? const Color(0xFFD97706)
+                                : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          const Expanded(
+                            child: Text(
+                              'LIGHT (LDR)',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondary,
+                                letterSpacing: 0.4,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isLightDetected ? 'EXPOSED' : 'DARK',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: isLightDetected
+                              ? const Color(0xFFB45309)
+                              : const Color(0xFF16A34A),
+                        ),
+                      ),
+                      Text(
+                        isLightDetected ? 'Light Alert' : 'Safe / Sealed',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: isLightDetected
+                              ? const Color(0xFFD97706)
+                              : AppColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // Actuator status indicators (Peltier cooling & Fan)
+          // Actuator status indicators (Peltier cooling & Fan) & Range
           Wrap(
             spacing: 8,
             runSpacing: 6,
@@ -267,15 +388,45 @@ class CompartmentMetricCard extends StatelessWidget {
                   ),
                 ],
               ),
-              Text(
-                isWithinRange ? 'Within Limits' : 'Out of Bounds',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: isWithinRange
-                      ? AppColors.statusNormal
-                      : AppColors.statusWarning,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isLightDetected) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 10, color: Color(0xFFD97706)),
+                          SizedBox(width: 3),
+                          Text(
+                            'Photo-risk',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    isWithinRange ? 'Within Limits' : 'Out of Bounds',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isWithinRange
+                          ? AppColors.statusNormal
+                          : AppColors.statusWarning,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

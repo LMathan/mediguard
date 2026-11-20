@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/metric_card.dart';
-import '../../data/models/sensor_reading.dart';
+import '../../data/models/risk_assessment.dart';
 import '../../shared/providers/app_providers.dart';
 import '../../shared/widgets/status_badge.dart';
 
@@ -14,6 +14,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overallStatus = ref.watch(overallStatusProvider);
+    final riskAssessment = ref.watch(riskAssessmentProvider);
     final readingAsync = ref.watch(sensorReadingStreamProvider);
     final dataSource = ref.watch(sensorDataSourceProvider);
     final currentReading = readingAsync.value ?? dataSource.latestReading;
@@ -32,6 +33,18 @@ class HomeScreen extends ConsumerWidget {
               currentReading.normalTemperatureC <= 25.0)
         : (currentReading.normalTemperatureC >= settings.normalTempMinC &&
               currentReading.normalTemperatureC <= settings.normalTempMaxC);
+
+    // Gradient based on risk level
+    List<Color> gradientColors;
+    if (riskAssessment.condition == HealthCondition.offline) {
+      gradientColors = const [Color(0xFF334155), Color(0xFF1E293B)];
+    } else if (riskAssessment.level == RiskLevel.high) {
+      gradientColors = const [Color(0xFF991B1B), Color(0xFF5B1010)];
+    } else if (riskAssessment.level == RiskLevel.medium) {
+      gradientColors = const [Color(0xFFB45309), Color(0xFF78350F)];
+    } else {
+      gradientColors = const [Color(0xFF165B33), Color(0xFF0F3E22)];
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -53,18 +66,18 @@ class HomeScreen extends ConsumerWidget {
               _buildDeviceSelector(context, ref),
               const SizedBox(height: 14),
 
-              // 2. System Health Summary Card
+              // 2. System Health & Risk Assessment Card
               Container(
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF165B33), Color(0xFF0F3E22)],
+                  gradient: LinearGradient(
+                    colors: gradientColors,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.25),
+                      color: gradientColors.first.withValues(alpha: 0.28),
                       blurRadius: 14,
                       offset: const Offset(0, 6),
                     ),
@@ -74,36 +87,203 @@ class HomeScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Top row: Header label + Badges
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'SYSTEM STATUS',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFA7D7B5),
-                            letterSpacing: 1.2,
-                          ),
+                        Row(
+                          children: [
+                            Icon(
+                              riskAssessment.condition.icon,
+                              size: 15,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'HEALTH & RISK CONDITION',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFA7D7B5),
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                          ],
                         ),
-                        StatusBadge(status: overallStatus),
+                        // Badges Row
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            StatusBadge(status: overallStatus, isCompact: true),
+                            const SizedBox(width: 6),
+                            // Risk Level Pill
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: Colors.white38,
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          riskAssessment.level == RiskLevel.low
+                                          ? const Color(0xFF4ADE80)
+                                          : riskAssessment.level ==
+                                                RiskLevel.medium
+                                          ? const Color(0xFFFBBF24)
+                                          : const Color(0xFFF87171),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    riskAssessment.level.label.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
+
+                    // Condition Headline
                     Text(
-                      overallStatus == OverallStatus.normal
-                          ? 'All Storage Zones Optimal'
-                          : overallStatus == OverallStatus.warning
-                          ? 'Environmental Warning Detected'
-                          : overallStatus == OverallStatus.critical
-                          ? 'CRITICAL ALERT: Inspect Immediately'
-                          : 'Device Status Unknown / Offline',
+                      riskAssessment.condition == HealthCondition.healthy
+                          ? 'Storage Environment Healthy'
+                          : riskAssessment.condition == HealthCondition.atRisk
+                              ? 'Storage Parameters At Risk'
+                              : riskAssessment.condition == HealthCondition.critical
+                                  ? 'CRITICAL RISK: Storage Integrity Breach'
+                                  : 'Device Telemetry Offline',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
                       ),
                     ),
+                    const SizedBox(height: 12),
+
+                    // Risk Score Meter Bar
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Risk Index: ${riskAssessment.score.toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Category: ${riskAssessment.level.label.toUpperCase()}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: riskAssessment.level == RiskLevel.low
+                                    ? const Color(0xFF86EFAC)
+                                    : riskAssessment.level == RiskLevel.medium
+                                        ? const Color(0xFFFDE047)
+                                        : const Color(0xFFFCA5A5),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: (riskAssessment.score / 100.0).clamp(0.0, 1.0),
+                            minHeight: 7,
+                            backgroundColor: Colors.white24,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              riskAssessment.level == RiskLevel.low
+                                  ? const Color(0xFF4ADE80)
+                                  : riskAssessment.level == RiskLevel.medium
+                                      ? const Color(0xFFFBBF24)
+                                      : const Color(0xFFF87171),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Contributing factors or nominal chips
+                    if (riskAssessment.riskFactors.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: riskAssessment.riskFactors.map((factor) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.28),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.white30, width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 11,
+                                  color: Colors.amberAccent,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  factor,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          _buildHealthTag('Cold: ${currentReading.coldTemperatureC.toStringAsFixed(1)}°C Nominal'),
+                          _buildHealthTag('Room: ${currentReading.normalTemperatureC.toStringAsFixed(1)}°C Nominal'),
+                          _buildHealthTag('LDR: Dark (Safe)'),
+                          _buildHealthTag('Doors: Sealed'),
+                        ],
+                      ),
+                    ],
+
                     const SizedBox(height: 14),
                     const Divider(color: Colors.white24, height: 1),
                     const SizedBox(height: 12),
@@ -235,6 +415,9 @@ class HomeScreen extends ConsumerWidget {
                 isFanActive: currentReading.normalFanActive,
                 isCold: true,
                 isWithinRange: isColdWithinRange,
+                isLightDetected: currentReading.coldLightDetected,
+                riskLevel: riskAssessment.coldLevel,
+                riskScore: riskAssessment.coldScore,
               ),
               const SizedBox(height: 14),
 
@@ -249,6 +432,9 @@ class HomeScreen extends ConsumerWidget {
                 isFanActive: currentReading.normalFanActive,
                 isCold: false,
                 isWithinRange: isNormalWithinRange,
+                isLightDetected: currentReading.normalLightDetected,
+                riskLevel: riskAssessment.normalLevel,
+                riskScore: riskAssessment.normalScore,
               ),
               const SizedBox(height: 24),
 
@@ -611,6 +797,35 @@ class HomeScreen extends ConsumerWidget {
             error: (_, _) => const Text(
               'Failed to load devices',
               style: TextStyle(fontSize: 12, color: AppColors.statusCritical),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHealthTag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.white12,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            size: 10,
+            color: Color(0xFF4ADE80),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
         ],

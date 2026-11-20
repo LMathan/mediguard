@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../data/models/device_settings.dart';
+import '../../data/models/risk_assessment.dart';
 import '../../data/models/sensor_reading.dart';
 import '../../shared/providers/app_providers.dart';
 
@@ -22,6 +24,8 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
     final dataSource = ref.watch(sensorDataSourceProvider);
     final currentReading = readingAsync.value ?? dataSource.latestReading;
     final historyAsync = ref.watch(sensorHistoryProvider(_selectedWindow));
+    final settings = ref.watch(deviceSettingsProvider).value;
+    final riskAssessment = ref.watch(riskAssessmentProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -121,6 +125,118 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                   _buildWindowTab(const Duration(hours: 6), '6 Hours'),
                   _buildWindowTab(const Duration(hours: 24), '24 Hours'),
                   _buildWindowTab(const Duration(days: 7), '7 Days'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 1. Storage Health & Risk Index (%) Graph
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.border),
+              ),
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: riskAssessment.level.bgColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.shield_outlined,
+                              size: 16,
+                              color: riskAssessment.level.color,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Storage Risk Index (%)',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                'Realtime Risk Calculated from Telemetry',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      // Current Risk Level Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: riskAssessment.level.bgColor,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: riskAssessment.level.color.withValues(
+                              alpha: 0.3,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          '${riskAssessment.score.toStringAsFixed(0)}% • ${riskAssessment.level.label.toUpperCase()}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: riskAssessment.level.color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Risk Thresholds Legend
+                  Row(
+                    children: [
+                      _buildLegendDot(const Color(0xFF16A34A), 'Low (0-25%)'),
+                      const SizedBox(width: 10),
+                      _buildLegendDot(const Color(0xFFD97706), 'Med (26-60%)'),
+                      const SizedBox(width: 10),
+                      _buildLegendDot(const Color(0xFFDC2626), 'High (61-100%)'),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  SizedBox(
+                    height: 190,
+                    child: historyAsync.when(
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Chart error: $e')),
+                      data: (history) {
+                        if (history.isEmpty) {
+                          return const Center(
+                            child: Text('No telemetry available for window.'),
+                          );
+                        }
+                        return _buildRiskChart(history, settings);
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -309,6 +425,36 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildDiagnosticTile(
+                          title: 'Cold LDR Sensor',
+                          status: currentReading.coldLightDetected
+                              ? 'LIGHT DETECTED'
+                              : 'Dark (Protected)',
+                          isActive: !currentReading.coldLightDetected,
+                          icon: currentReading.coldLightDetected
+                              ? Icons.wb_sunny_rounded
+                              : Icons.nightlight_round,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildDiagnosticTile(
+                          title: 'Room LDR Sensor',
+                          status: currentReading.normalLightDetected
+                              ? 'LIGHT DETECTED'
+                              : 'Dark (Protected)',
+                          isActive: !currentReading.normalLightDetected,
+                          icon: currentReading.normalLightDetected
+                              ? Icons.wb_sunny_rounded
+                              : Icons.nightlight_round,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -409,6 +555,108 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRiskChart(List<SensorReading> history, DeviceSettings? settings) {
+    final spots = <FlSpot>[];
+
+    for (int i = 0; i < history.length; i++) {
+      final assessment = RiskAssessment.fromReading(history[i], settings);
+      spots.add(FlSpot(i.toDouble(), assessment.score));
+    }
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: 25,
+          getDrawingHorizontalLine: (value) {
+            if (value == 25) {
+              return FlLine(
+                color: const Color(0xFF16A34A).withValues(alpha: 0.35),
+                strokeWidth: 1,
+                dashArray: [4, 4],
+              );
+            }
+            if (value == 60) {
+              return FlLine(
+                color: const Color(0xFFDC2626).withValues(alpha: 0.35),
+                strokeWidth: 1,
+                dashArray: [4, 4],
+              );
+            }
+            return const FlLine(color: AppColors.border, strokeWidth: 0.8);
+          },
+        ),
+        titlesData: FlTitlesData(
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 22,
+              interval: (history.length / 4).clamp(1, 10).toDouble(),
+              getTitlesWidget: (val, meta) {
+                final idx = val.toInt();
+                if (idx < 0 || idx >= history.length) {
+                  return const SizedBox.shrink();
+                }
+                return Text(
+                  Formatters.shortTime(history[idx].recordedAt),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textMuted,
+                  ),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 34,
+              interval: 25,
+              getTitlesWidget: (val, meta) => Text(
+                '${val.toInt()}%',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        minY: 0,
+        maxY: 100,
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: const Color(0xFFD97706),
+            barWidth: 2.5,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  const Color(0xFF16A34A).withValues(alpha: 0.05),
+                  const Color(0xFFD97706).withValues(alpha: 0.15),
+                  const Color(0xFFDC2626).withValues(alpha: 0.25),
+                ],
+              ),
             ),
           ),
         ],
