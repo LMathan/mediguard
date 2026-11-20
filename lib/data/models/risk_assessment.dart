@@ -101,6 +101,87 @@ enum HealthCondition {
   }
 }
 
+class DoorAndLightExposureTracker {
+  static final DoorAndLightExposureTracker instance =
+      DoorAndLightExposureTracker._internal();
+
+  DoorAndLightExposureTracker._internal();
+
+  DateTime? coldDoorOpenedAt;
+  DateTime? normalDoorOpenedAt;
+  DateTime? coldLightDetectedAt;
+  DateTime? normalLightDetectedAt;
+
+  void record({
+    required bool coldDoorOpen,
+    required bool normalDoorOpen,
+    required bool coldLightDetected,
+    required bool normalLightDetected,
+    DateTime? now,
+  }) {
+    final current = now ?? DateTime.now();
+
+    if (coldDoorOpen) {
+      coldDoorOpenedAt ??= current;
+    } else {
+      coldDoorOpenedAt = null;
+    }
+
+    if (normalDoorOpen) {
+      normalDoorOpenedAt ??= current;
+    } else {
+      normalDoorOpenedAt = null;
+    }
+
+    if (coldLightDetected) {
+      coldLightDetectedAt ??= current;
+    } else {
+      coldLightDetectedAt = null;
+    }
+
+    if (normalLightDetected) {
+      normalLightDetectedAt ??= current;
+    } else {
+      normalLightDetectedAt = null;
+    }
+  }
+
+  bool isColdDoorExceeded({DateTime? now, int thresholdSeconds = 60}) {
+    if (coldDoorOpenedAt == null) return false;
+    return (now ?? DateTime.now()).difference(coldDoorOpenedAt!).inSeconds >=
+        thresholdSeconds;
+  }
+
+  bool isNormalDoorExceeded({DateTime? now, int thresholdSeconds = 60}) {
+    if (normalDoorOpenedAt == null) return false;
+    return (now ?? DateTime.now()).difference(normalDoorOpenedAt!).inSeconds >=
+        thresholdSeconds;
+  }
+
+  bool isColdLightExceeded({DateTime? now, int thresholdSeconds = 60}) {
+    if (coldLightDetectedAt == null) return false;
+    return (now ?? DateTime.now())
+            .difference(coldLightDetectedAt!)
+            .inSeconds >=
+        thresholdSeconds;
+  }
+
+  bool isNormalLightExceeded({DateTime? now, int thresholdSeconds = 60}) {
+    if (normalLightDetectedAt == null) return false;
+    return (now ?? DateTime.now())
+            .difference(normalLightDetectedAt!)
+            .inSeconds >=
+        thresholdSeconds;
+  }
+
+  void reset() {
+    coldDoorOpenedAt = null;
+    normalDoorOpenedAt = null;
+    coldLightDetectedAt = null;
+    normalLightDetectedAt = null;
+  }
+}
+
 class RiskAssessment {
   final double score; // 0.0 to 100.0
   final RiskLevel level;
@@ -125,6 +206,8 @@ class RiskAssessment {
   factory RiskAssessment.fromReading(
     SensorReading reading, [
     DeviceSettings? settings,
+    DoorAndLightExposureTracker? tracker,
+    DateTime? now,
   ]) {
     // If no readings have been recorded yet
     if (reading.recordedAt.millisecondsSinceEpoch == 0) {
@@ -140,7 +223,7 @@ class RiskAssessment {
       );
     }
 
-    // If telemetry is older than 60s
+    // If telemetry is older than 60s (device offline mark as high risk)
     if (reading.isStale()) {
       return const RiskAssessment(
         score: 100.0,
@@ -154,83 +237,103 @@ class RiskAssessment {
       );
     }
 
-    final coldMin = settings?.coldTempMinC ?? 2.0;
-    final coldMax = settings?.coldTempMaxC ?? 8.0;
-    final normalMin = settings?.normalTempMinC ?? 15.0;
-    final normalMax = settings?.normalTempMaxC ?? 25.0;
+    final effectiveTracker = tracker ?? DoorAndLightExposureTracker.instance;
+    final evalTime = now ?? DateTime.now();
+
+    effectiveTracker.record(
+      coldDoorOpen: reading.coldDoorOpen,
+      normalDoorOpen: reading.normalDoorOpen,
+      coldLightDetected: reading.coldLightDetected,
+      normalLightDetected: reading.normalLightDetected,
+      now: evalTime,
+    );
+
+    // Prototype thresholds:
+    // Cold storage is normal up to 20°C. Points calculated above 20°C.
+    // Room storage is normal up to 28°C. Points calculated above 28°C.
+    // Cold & room humidity normal up to 70%. Points calculated above 70%.
+    const prototypeColdMax = 20.0;
+    const prototypeNormalMax = 28.0;
+    const prototypeHumidityMax = 70.0;
 
     double coldPoints = 0.0;
     double normalPoints = 0.0;
     final factors = <String>[];
 
-    // 1. Cold Zone Temp
-    if (reading.coldTemperatureC > coldMax) {
-      final diff = reading.coldTemperatureC - coldMax;
-      if (diff <= 2.0) {
+    // 1. Cold Zone Temp (Normal up to 20°C in prototype)
+    if (reading.coldTemperatureC > prototypeColdMax) {
+      final diff = reading.coldTemperatureC - prototypeColdMax;
+      if (diff <= 3.0) {
         coldPoints += 20.0;
-      } else if (diff <= 5.0) {
+      } else if (diff <= 6.0) {
         coldPoints += 38.0;
       } else {
         coldPoints += 55.0;
       }
-      factors.add('Cold Temp High (${reading.coldTemperatureC.toStringAsFixed(1)}°C)');
-    } else if (reading.coldTemperatureC < coldMin) {
-      final diff = coldMin - reading.coldTemperatureC;
-      if (diff <= 2.0) {
-        coldPoints += 22.0;
-      } else {
-        coldPoints += 50.0;
-      }
-      factors.add('Cold Temp Low (${reading.coldTemperatureC.toStringAsFixed(1)}°C)');
+      factors.add(
+        'Cold Temp High (${reading.coldTemperatureC.toStringAsFixed(1)}°C > 20°C)',
+      );
+    } else if (reading.coldTemperatureC < 0.0) {
+      coldPoints += 30.0;
+      factors.add(
+        'Cold Temp Sub-zero Freezing (${reading.coldTemperatureC.toStringAsFixed(1)}°C)',
+      );
     }
 
-    // 2. Normal Zone Temp
-    if (reading.normalTemperatureC > normalMax) {
-      final diff = reading.normalTemperatureC - normalMax;
+    // 2. Normal Zone Temp (Normal up to 28°C in prototype)
+    if (reading.normalTemperatureC > prototypeNormalMax) {
+      final diff = reading.normalTemperatureC - prototypeNormalMax;
       if (diff <= 3.0) {
         normalPoints += 15.0;
       } else {
         normalPoints += 30.0;
       }
-      factors.add('Room Temp High (${reading.normalTemperatureC.toStringAsFixed(1)}°C)');
-    } else if (reading.normalTemperatureC < normalMin) {
-      final diff = normalMin - reading.normalTemperatureC;
-      if (diff <= 3.0) {
-        normalPoints += 12.0;
-      } else {
-        normalPoints += 28.0;
-      }
-      factors.add('Room Temp Low (${reading.normalTemperatureC.toStringAsFixed(1)}°C)');
+      factors.add(
+        'Room Temp High (${reading.normalTemperatureC.toStringAsFixed(1)}°C > 28°C)',
+      );
+    } else if (reading.normalTemperatureC < 10.0) {
+      normalPoints += 20.0;
+      factors.add(
+        'Room Temp Low (${reading.normalTemperatureC.toStringAsFixed(1)}°C)',
+      );
     }
 
-    // 3. Humidity
-    if (reading.coldHumidityPct > 68.0 || reading.coldHumidityPct < 32.0) {
+    // 3. Humidity (Normal up to 70% in prototype)
+    if (reading.coldHumidityPct > prototypeHumidityMax) {
       coldPoints += 10.0;
-      factors.add('Cold Humidity (${reading.coldHumidityPct.toStringAsFixed(0)}%)');
+      factors.add(
+        'Cold Humidity (${reading.coldHumidityPct.toStringAsFixed(0)}% > 70%)',
+      );
     }
-    if (reading.normalHumidityPct > 65.0 || reading.normalHumidityPct < 28.0) {
+    if (reading.normalHumidityPct > prototypeHumidityMax) {
       normalPoints += 10.0;
-      factors.add('Room Humidity (${reading.normalHumidityPct.toStringAsFixed(0)}%)');
+      factors.add(
+        'Room Humidity (${reading.normalHumidityPct.toStringAsFixed(0)}% > 70%)',
+      );
     }
 
-    // 4. Door Open (Reed Switches)
-    if (reading.coldDoorOpen) {
+    // 4. Door Open (Reed Switches: risk only if open > 1 minute)
+    if (reading.coldDoorOpen &&
+        effectiveTracker.isColdDoorExceeded(now: evalTime)) {
       coldPoints += 25.0;
-      factors.add('Cold Compartment Door Open');
+      factors.add('Cold Door Open (>1 min)');
     }
-    if (reading.normalDoorOpen) {
+    if (reading.normalDoorOpen &&
+        effectiveTracker.isNormalDoorExceeded(now: evalTime)) {
       normalPoints += 15.0;
-      factors.add('Room Compartment Door Open');
+      factors.add('Room Door Open (>1 min)');
     }
 
-    // 5. Light Sensor (LDR Module)
-    if (reading.coldLightDetected) {
+    // 5. Light Sensor (LDR Module: risk only if exposed > 1 minute)
+    if (reading.coldLightDetected &&
+        effectiveTracker.isColdLightExceeded(now: evalTime)) {
       coldPoints += 20.0;
-      factors.add('Cold LDR: Light Exposure Detected');
+      factors.add('Cold LDR: Light Exposed (>1 min)');
     }
-    if (reading.normalLightDetected) {
+    if (reading.normalLightDetected &&
+        effectiveTracker.isNormalLightExceeded(now: evalTime)) {
       normalPoints += 12.0;
-      factors.add('Room LDR: Light Exposure Detected');
+      factors.add('Room LDR: Light Exposed (>1 min)');
     }
 
     // 6. Sensor Health

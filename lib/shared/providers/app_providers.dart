@@ -223,51 +223,7 @@ final sensorHistoryProvider =
       return await repo.getHistory(window: window, deviceId: selectedDeviceId);
     });
 
-// 7. Overall System Status Provider
-final overallStatusProvider = Provider<OverallStatus>((ref) {
-  final dataSource = ref.watch(sensorDataSourceProvider);
-  final readingAsync = ref.watch(sensorReadingStreamProvider);
-  final settingsAsync = ref.watch(deviceSettingsProvider);
-
-  final reading = readingAsync.value ?? dataSource.latestReading;
-  final settings = settingsAsync.value ?? DeviceSettings.defaultSettings();
-
-  // If no readings have been recorded in DB yet
-  if (reading.recordedAt.millisecondsSinceEpoch == 0) {
-    return OverallStatus.offline;
-  }
-
-  // If telemetry is older than 60 seconds, device is marked offline, never false normal
-  if (reading.isStale()) {
-    return OverallStatus.offline;
-  }
-
-  if (reading.sensorHealth == SensorHealth.error) {
-    return OverallStatus.critical;
-  }
-
-  // Check critical thresholds
-  if (reading.coldTemperatureC > (settings.coldTempMaxC + 4.0) ||
-      reading.coldTemperatureC < (settings.coldTempMinC - 3.0) ||
-      reading.normalTemperatureC > (settings.normalTempMaxC + 6.0)) {
-    return OverallStatus.critical;
-  }
-
-  // Check warning thresholds
-  if (reading.coldTemperatureC > settings.coldTempMaxC ||
-      reading.coldTemperatureC < settings.coldTempMinC ||
-      reading.normalTemperatureC > settings.normalTempMaxC ||
-      reading.normalTemperatureC < settings.normalTempMinC ||
-      reading.sensorHealth == SensorHealth.warning ||
-      reading.coldDoorOpen ||
-      reading.normalDoorOpen) {
-    return OverallStatus.warning;
-  }
-
-  return OverallStatus.normal;
-});
-
-// 7b. Storage Health & Risk Assessment Provider
+// 7. Storage Health & Risk Assessment Provider
 final riskAssessmentProvider = Provider<RiskAssessment>((ref) {
   final dataSource = ref.watch(sensorDataSourceProvider);
   final readingAsync = ref.watch(sensorReadingStreamProvider);
@@ -277,6 +233,21 @@ final riskAssessmentProvider = Provider<RiskAssessment>((ref) {
   final settings = settingsAsync.value;
 
   return RiskAssessment.fromReading(reading, settings);
+});
+
+// 7b. Overall System Status Provider (Derived from unified risk assessment)
+final overallStatusProvider = Provider<OverallStatus>((ref) {
+  final risk = ref.watch(riskAssessmentProvider);
+  switch (risk.condition) {
+    case HealthCondition.offline:
+      return OverallStatus.offline;
+    case HealthCondition.critical:
+      return OverallStatus.critical;
+    case HealthCondition.atRisk:
+      return OverallStatus.warning;
+    case HealthCondition.healthy:
+      return OverallStatus.normal;
+  }
 });
 
 // 8. Medicine List Notifier (with search and filter states)
