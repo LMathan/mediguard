@@ -88,6 +88,8 @@ class CompartmentMetricCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'Target: $targetRange',
@@ -96,10 +98,13 @@ class CompartmentMetricCard extends StatelessWidget {
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w500,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 6),
 
               // Compartment Risk Badge
               if (riskLevel != null) ...[
@@ -126,7 +131,9 @@ class CompartmentMetricCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        riskLevel!.label.toUpperCase(),
+                        riskLevel == RiskLevel.medium
+                            ? 'MED RISK'
+                            : riskLevel!.label.toUpperCase(),
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
@@ -186,8 +193,8 @@ class CompartmentMetricCard extends StatelessWidget {
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 10,
+                    horizontal: 8,
+                    vertical: 9,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceVariant,
@@ -240,8 +247,8 @@ class CompartmentMetricCard extends StatelessWidget {
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 10,
+                    horizontal: 8,
+                    vertical: 9,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceVariant,
@@ -292,8 +299,8 @@ class CompartmentMetricCard extends StatelessWidget {
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 10,
+                    horizontal: 8,
+                    vertical: 9,
                   ),
                   decoration: BoxDecoration(
                     color: isLightDetected

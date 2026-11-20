@@ -83,15 +83,17 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top row: Header label + Badges
+                    // Top row: Category label + StatusBadge
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               riskAssessment.condition.icon,
@@ -100,88 +102,94 @@ class HomeScreen extends ConsumerWidget {
                             ),
                             const SizedBox(width: 6),
                             const Text(
-                              'HEALTH & RISK CONDITION',
+                              'SYSTEM HEALTH',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFFA7D7B5),
-                                letterSpacing: 1.1,
+                                letterSpacing: 1.0,
                               ),
                             ),
                           ],
                         ),
-                        // Badges Row
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            StatusBadge(status: overallStatus, isCompact: true),
-                            const SizedBox(width: 6),
-                            // Risk Level Pill
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white24,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: Colors.white38,
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 7,
-                                    height: 7,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          riskAssessment.level == RiskLevel.low
-                                          ? const Color(0xFF4ADE80)
-                                          : riskAssessment.level ==
-                                                RiskLevel.medium
-                                          ? const Color(0xFFFBBF24)
-                                          : const Color(0xFFF87171),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    riskAssessment.level.label.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                      letterSpacing: 0.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                        StatusBadge(status: overallStatus, isCompact: true),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // Condition Headline
-                    Text(
-                      riskAssessment.condition == HealthCondition.healthy
-                          ? 'Storage Environment Healthy'
-                          : riskAssessment.condition == HealthCondition.atRisk
-                              ? 'Storage Parameters At Risk'
-                              : riskAssessment.condition == HealthCondition.critical
-                                  ? 'CRITICAL RISK: Storage Integrity Breach'
-                                  : 'Device Telemetry Offline',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
+                    // Condition Headline (Expanded) + High Risk Box (Fully contained & aligned)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            riskAssessment.condition == HealthCondition.healthy
+                                ? 'Storage Environment Healthy'
+                                : riskAssessment.condition ==
+                                      HealthCondition.atRisk
+                                ? 'Storage Parameters At Risk'
+                                : riskAssessment.condition ==
+                                      HealthCondition.critical
+                                ? 'Storage Integrity Breach'
+                                : 'Device Telemetry Offline',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1.25,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Risk Level Pill (Vivid, solid, always fits within card boundaries)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: riskAssessment.level == RiskLevel.high
+                                ? const Color(0xFFDC2626)
+                                : riskAssessment.level == RiskLevel.medium
+                                ? const Color(0xFFD97706)
+                                : const Color(0xFF16A34A),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                riskAssessment.level == RiskLevel.high
+                                    ? Icons.warning_rounded
+                                    : riskAssessment.level == RiskLevel.medium
+                                    ? Icons.info_outline_rounded
+                                    : Icons.check_circle_outline_rounded,
+                                size: 13,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                riskAssessment.level.label.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
                     // Risk Score Meter Bar
                     Column(
@@ -199,15 +207,19 @@ class HomeScreen extends ConsumerWidget {
                               ),
                             ),
                             Text(
-                              'Category: ${riskAssessment.level.label.toUpperCase()}',
+                              riskAssessment.level == RiskLevel.low
+                                  ? 'Safe Operating Limits'
+                                  : riskAssessment.level == RiskLevel.medium
+                                  ? 'Action Recommended'
+                                  : 'Immediate Attention Required',
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
                                 color: riskAssessment.level == RiskLevel.low
                                     ? const Color(0xFF86EFAC)
                                     : riskAssessment.level == RiskLevel.medium
-                                        ? const Color(0xFFFDE047)
-                                        : const Color(0xFFFCA5A5),
+                                    ? const Color(0xFFFDE047)
+                                    : const Color(0xFFFCA5A5),
                               ),
                             ),
                           ],
@@ -216,15 +228,18 @@ class HomeScreen extends ConsumerWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: LinearProgressIndicator(
-                            value: (riskAssessment.score / 100.0).clamp(0.0, 1.0),
+                            value: (riskAssessment.score / 100.0).clamp(
+                              0.0,
+                              1.0,
+                            ),
                             minHeight: 7,
                             backgroundColor: Colors.white24,
                             valueColor: AlwaysStoppedAnimation<Color>(
                               riskAssessment.level == RiskLevel.low
                                   ? const Color(0xFF4ADE80)
                                   : riskAssessment.level == RiskLevel.medium
-                                      ? const Color(0xFFFBBF24)
-                                      : const Color(0xFFF87171),
+                                  ? const Color(0xFFFBBF24)
+                                  : const Color(0xFFF87171),
                             ),
                           ),
                         ),
