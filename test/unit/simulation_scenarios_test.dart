@@ -45,12 +45,13 @@ void main() {
       },
     );
 
-    test('Door open scenario registers cold door open and light detected', () {
+    test('Door open scenario registers cold door open and light exposed', () {
       service.setScenario(SimulationScenario.doorOpen);
       final reading = service.latestReading;
 
       expect(reading.coldDoorOpen, isTrue);
-      expect(reading.coldLightDetected, isTrue);
+      expect(reading.isColdExposed, isTrue);
+      expect(reading.coldLightDetected, isFalse);
     });
 
     test(

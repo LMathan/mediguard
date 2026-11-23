@@ -434,26 +434,26 @@ class _MonitoringScreenState extends ConsumerState<MonitoringScreen> {
                       Expanded(
                         child: _buildDiagnosticTile(
                           title: 'Cold LDR Sensor',
-                          status: currentReading.coldLightDetected
-                              ? 'LIGHT DETECTED'
-                              : 'Dark (Protected)',
-                          isActive: !currentReading.coldLightDetected,
-                          icon: currentReading.coldLightDetected
-                              ? Icons.wb_sunny_rounded
-                              : Icons.nightlight_round,
+                          status: currentReading.isColdDark
+                              ? 'Dark (Protected)'
+                              : 'LIGHT EXPOSED',
+                          isActive: currentReading.isColdDark,
+                          icon: currentReading.isColdDark
+                              ? Icons.nightlight_round
+                              : Icons.wb_sunny_rounded,
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: _buildDiagnosticTile(
                           title: 'Room LDR Sensor',
-                          status: currentReading.normalLightDetected
-                              ? 'LIGHT DETECTED'
-                              : 'Dark (Protected)',
-                          isActive: !currentReading.normalLightDetected,
-                          icon: currentReading.normalLightDetected
-                              ? Icons.wb_sunny_rounded
-                              : Icons.nightlight_round,
+                          status: currentReading.isNormalDark
+                              ? 'Dark (Protected)'
+                              : 'LIGHT EXPOSED',
+                          isActive: currentReading.isNormalDark,
+                          icon: currentReading.isNormalDark
+                              ? Icons.nightlight_round
+                              : Icons.wb_sunny_rounded,
                         ),
                       ),
                     ],

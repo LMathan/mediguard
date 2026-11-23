@@ -243,8 +243,8 @@ class RiskAssessment {
     effectiveTracker.record(
       coldDoorOpen: reading.coldDoorOpen,
       normalDoorOpen: reading.normalDoorOpen,
-      coldLightDetected: reading.coldLightDetected,
-      normalLightDetected: reading.normalLightDetected,
+      coldLightDetected: reading.isColdExposed,
+      normalLightDetected: reading.isNormalExposed,
       now: evalTime,
     );
 
@@ -324,13 +324,13 @@ class RiskAssessment {
       factors.add('Room Door Open (>1 min)');
     }
 
-    // 5. Light Sensor (LDR Module: risk only if exposed > 1 minute)
-    if (reading.coldLightDetected &&
+    // 5. Light Sensor (LDR Module: risk only if exposed > 1 minute, where false = exposed)
+    if (reading.isColdExposed &&
         effectiveTracker.isColdLightExceeded(now: evalTime)) {
       coldPoints += 20.0;
       factors.add('Cold LDR: Light Exposed (>1 min)');
     }
-    if (reading.normalLightDetected &&
+    if (reading.isNormalExposed &&
         effectiveTracker.isNormalLightExceeded(now: evalTime)) {
       normalPoints += 12.0;
       factors.add('Room LDR: Light Exposed (>1 min)');

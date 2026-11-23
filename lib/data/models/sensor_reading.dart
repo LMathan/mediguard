@@ -94,14 +94,23 @@ class SensorReading {
     required this.coldHumidityPct,
     this.normalDoorOpen = false,
     this.coldDoorOpen = false,
-    this.normalLightDetected = false,
-    this.coldLightDetected = false,
+    this.normalLightDetected = true,
+    this.coldLightDetected = true,
     this.coolingActive = false,
     this.normalFanActive = false,
     this.sensorHealth = SensorHealth.healthy,
     this.dataSource = DataSourceType.simulated,
     required this.recordedAt,
   });
+
+  /// Hardware LDR Inverted Logic:
+  /// true in DB = Dark / Sealed / Protected (Safe)
+  /// false in DB = Exposed / Light Alert (Risk)
+  bool get isColdDark => coldLightDetected;
+  bool get isColdExposed => !coldLightDetected;
+
+  bool get isNormalDark => normalLightDetected;
+  bool get isNormalExposed => !normalLightDetected;
 
   /// True if reading was recorded more than [threshold] ago
   bool isStale({Duration threshold = const Duration(seconds: 60)}) {

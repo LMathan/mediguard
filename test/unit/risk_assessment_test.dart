@@ -15,8 +15,8 @@ void main() {
         coldHumidityPct: 68.0,
         normalDoorOpen: false,
         coldDoorOpen: false,
-        normalLightDetected: false,
-        coldLightDetected: false,
+        normalLightDetected: true,
+        coldLightDetected: true,
         sensorHealth: SensorHealth.healthy,
         dataSource: DataSourceType.hardware,
         recordedAt: now,
@@ -184,7 +184,7 @@ void main() {
         normalHumidityPct: 50.0,
         coldTemperatureC: 15.0,
         coldHumidityPct: 50.0,
-        coldLightDetected: true,
+        coldLightDetected: false, // Inverted: false = light exposed
         recordedAt: startTime,
       );
 
@@ -208,7 +208,7 @@ void main() {
         normalHumidityPct: 50.0,
         coldTemperatureC: 15.0,
         coldHumidityPct: 50.0,
-        coldLightDetected: true,
+        coldLightDetected: false, // Inverted: false = light exposed
         recordedAt: startTime,
       );
 
