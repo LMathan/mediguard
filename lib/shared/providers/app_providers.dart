@@ -5,6 +5,7 @@ import '../../data/models/device_info.dart';
 import '../../data/models/device_settings.dart';
 import '../../data/models/inventory_transaction.dart';
 import '../../data/models/medicine.dart';
+import '../../data/models/ml_models.dart';
 import '../../data/models/risk_assessment.dart';
 import '../../data/models/sensor_reading.dart';
 import '../../data/models/unregistered_medicine.dart';
@@ -248,6 +249,36 @@ final overallStatusProvider = Provider<OverallStatus>((ref) {
     case HealthCondition.healthy:
       return OverallStatus.normal;
   }
+});
+
+// 7c. ML Predictive Temperature Excursion Provider
+final temperatureForecastProvider = Provider<TemperatureForecast>((ref) {
+  final dataSource = ref.watch(sensorDataSourceProvider);
+  final readingAsync = ref.watch(sensorReadingStreamProvider);
+  final currentReading = readingAsync.value ?? dataSource.latestReading;
+  final history =
+      ref.watch(sensorHistoryProvider(const Duration(hours: 1))).value ?? [];
+
+  return TemperatureForecast.predict(
+    history: history,
+    currentReading: currentReading,
+    coldThreshold: 20.0,
+    normalThreshold: 28.0,
+  );
+});
+
+// 7d. ML Hardware Anomaly Detection Provider
+final hardwareAnomalyProvider = Provider<HardwareAnomalyAssessment>((ref) {
+  final dataSource = ref.watch(sensorDataSourceProvider);
+  final readingAsync = ref.watch(sensorReadingStreamProvider);
+  final currentReading = readingAsync.value ?? dataSource.latestReading;
+  final history =
+      ref.watch(sensorHistoryProvider(const Duration(hours: 1))).value ?? [];
+
+  return HardwareAnomalyAssessment.detect(
+    history: history,
+    currentReading: currentReading,
+  );
 });
 
 // 8. Medicine List Notifier (with search and filter states)
